@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { auth } from '@/lib/firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
+import { User as FirebaseUser } from 'firebase/auth';
 
-// Carrusel automático SIN imports de lucide-react ni cn
-const AUTO_CAROUSEL_INTERVAL = 3500; // ms
+const AUTO_CAROUSEL_INTERVAL = 3500;
 
 function AutoCarousel() {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -15,73 +15,44 @@ function AutoCarousel() {
     {
       title: "Registra gastos con tu voz",
       description: "Tan simple como decir 'menos 40 soles en McDonald's' para registrar tus gastos al instante.",
-      icon: <span style={{fontSize: 64, color: '#22c55e', display: 'inline-block', marginBottom: 24}}>🎤</span>
+      icon: <span style={{ fontSize: 64, color: '#22c55e', display: 'inline-block', marginBottom: 24 }}>🎤</span>
     },
     {
       title: "Gestiona finanzas en grupo",
       description: "Comparte gastos y maneja el presupuesto con tu familia, pareja o compañeros de casa.",
-      icon: <span style={{fontSize: 64, color: '#22c55e', display: 'inline-block', marginBottom: 24}}>👥</span>
+      icon: <span style={{ fontSize: 64, color: '#22c55e', display: 'inline-block', marginBottom: 24 }}>👥</span>
     },
     {
       title: "Cumple tus metas de ahorro",
       description: "Define objetivos financieros y visualiza tu progreso hasta alcanzarlos.",
-      icon: <span style={{fontSize: 64, color: '#22c55e', display: 'inline-block', marginBottom: 24}}>🎯</span>
+      icon: <span style={{ fontSize: 64, color: '#22c55e', display: 'inline-block', marginBottom: 24 }}>🎯</span>
     }
   ];
 
   useEffect(() => {
-    timerRef.current && clearTimeout(timerRef.current);
+    if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       setCurrentSlide((prev) => (prev < slides.length - 1 ? prev + 1 : 0));
     }, AUTO_CAROUSEL_INTERVAL);
 
     return () => {
-      timerRef.current && clearTimeout(timerRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [currentSlide, slides.length]);
+  }, [currentSlide]);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
         <div className="w-full max-w-md space-y-8 text-center">
-          {/* Logo */}
           <div className="flex flex-col items-center justify-center space-y-2">
-            <div
-              style={{
-                background: 'rgba(34,197,94,0.10)',
-                padding: '0.5rem 2.5rem',
-                borderRadius: '9999px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minWidth: 160,
-                minHeight: 64,
-                marginBottom: 8
-              }}
-            >
-              <span
-                style={{
-                  color: '#22c55e',
-                  fontWeight: 700,
-                  fontSize: 40,
-                  fontFamily: 'Inter, Arial, sans-serif',
-                  letterSpacing: 0.5
-                }}
-              >
-                COFI
-              </span>
+            <div style={{ background: 'rgba(34,197,94,0.10)', padding: '0.5rem 2.5rem', borderRadius: '9999px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 160, minHeight: 64, marginBottom: 8 }}>
+              <span style={{ color: '#22c55e', fontWeight: 700, fontSize: 40, fontFamily: 'Inter, Arial, sans-serif', letterSpacing: 0.5 }}>COFI</span>
             </div>
-            <p style={{
-              color: "#6b7280",
-              fontSize: 18,
-              margin: 0,
-              fontFamily: 'Inter, Arial, sans-serif'
-            }}>
+            <p style={{ color: "#6b7280", fontSize: 18, margin: 0, fontFamily: 'Inter, Arial, sans-serif' }}>
               Finanzas conscientes y colaborativas
             </p>
           </div>
-          {/* Slides */}
-          <div className="relative h-80 mt-12" style={{position: "relative"}}>
+          <div className="relative h-80 mt-12">
             {slides.map((slide, index) => (
               <div
                 key={index}
@@ -99,28 +70,15 @@ function AutoCarousel() {
                 }}
               >
                 {slide.icon}
-                <h2 style={{
-                  fontSize: 32,
-                  fontWeight: 700,
-                  marginBottom: 12,
-                  marginTop: 0,
-                  color: "#212121",
-                  fontFamily: 'Inter, Arial, sans-serif'
-                }}>
+                <h2 style={{ fontSize: 32, fontWeight: 700, marginBottom: 12, marginTop: 0, color: "#212121", fontFamily: 'Inter, Arial, sans-serif' }}>
                   {slide.title}
                 </h2>
-                <p style={{
-                  color: "#6b7280",
-                  fontSize: 20,
-                  fontFamily: 'Inter, Arial, sans-serif',
-                  margin: 0
-                }}>
+                <p style={{ color: "#6b7280", fontSize: 20, fontFamily: 'Inter, Arial, sans-serif', margin: 0 }}>
                   {slide.description}
                 </p>
               </div>
             ))}
           </div>
-          {/* Indicadores */}
           <div className="flex justify-center space-x-2 mt-2">
             {slides.map((_, index) => (
               <div
@@ -142,7 +100,7 @@ function AutoCarousel() {
 }
 
 export default function HomePage() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -151,10 +109,6 @@ export default function HomePage() {
 
     return () => unsubscribe();
   }, []);
-
-  const handleLogout = async () => {
-    await signOut(auth);
-  };
 
   return (
     <>
@@ -171,17 +125,11 @@ export default function HomePage() {
           <div>
             <h2 className="text-xl font-semibold mb-4">Acciones rápidas</h2>
             <div className="flex gap-6 mb-8">
-              <button
-                className="flex flex-col items-center justify-center border border-gray-200 rounded-2xl px-12 py-8 bg-white hover:bg-green-50 transition w-64"
-                type="button"
-              >
+              <button className="flex flex-col items-center justify-center border border-gray-200 rounded-2xl px-12 py-8 bg-white hover:bg-green-50 transition w-64" type="button">
                 <span className="text-2xl mb-2">＋</span>
                 <span className="text-base font-medium text-gray-700">Agregar gasto</span>
               </button>
-              <button
-                className="flex flex-col items-center justify-center border border-gray-200 rounded-2xl px-12 py-8 bg-white hover:bg-green-50 transition w-64"
-                type="button"
-              >
+              <button className="flex flex-col items-center justify-center border border-gray-200 rounded-2xl px-12 py-8 bg-white hover:bg-green-50 transition w-64" type="button">
                 <span className="text-2xl mb-2">💳</span>
                 <span className="text-base font-medium text-gray-700">Nueva cuenta</span>
               </button>

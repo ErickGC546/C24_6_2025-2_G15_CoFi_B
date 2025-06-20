@@ -17,9 +17,13 @@ export default function RegisterPage() {
 
     try {
       await createUserWithEmailAndPassword(auth, email, password);
-      router.push('/'); 
-    } catch (err: any) {
-      setError('No se pudo registrar. ' + (err?.message || 'Intenta de nuevo.'));
+      router.push('/');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError('No se pudo registrar. ' + err.message);
+      } else {
+        setError('No se pudo registrar. Intenta de nuevo.');
+      }
     }
   };
 
@@ -27,8 +31,8 @@ export default function RegisterPage() {
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-      router.push('/'); 
-    } catch (err) {
+      router.push('/');
+    } catch {
       setError('Error con Google');
     }
   };
@@ -84,6 +88,7 @@ export default function RegisterPage() {
               <p className="text-red-600 text-sm text-center">{error}</p>
             )}
           </form>
+
           {/* Separador con texto */}
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
@@ -93,6 +98,7 @@ export default function RegisterPage() {
               <span className="bg-white px-2 text-gray-400">o regístrate con</span>
             </div>
           </div>
+
           {/* Google button */}
           <button
             onClick={handleGoogleRegister}
@@ -123,4 +129,4 @@ export default function RegisterPage() {
       </div>
     </div>
   );
-};
+}
