@@ -62,9 +62,6 @@ export default function Navbar() {
               <Link href="/login">
                 <span className="cursor-pointer">Iniciar sesión</span>
               </Link>
-              <Link href="/register">
-                <span className="cursor-pointer">Registrarse</span>
-              </Link>
             </>
           )}
         </div>
