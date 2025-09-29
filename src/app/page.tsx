@@ -38,7 +38,7 @@ function AutoCarousel() {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [currentSlide]);
+  }, [currentSlide, slides.length]);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
