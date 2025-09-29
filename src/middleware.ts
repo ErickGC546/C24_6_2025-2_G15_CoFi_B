@@ -1,26 +1,22 @@
+// src/middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getAuth } from "firebase-admin/auth";
-import "@/lib/firebaseAdmin";
 
-export async function middleware(req: NextRequest) {
-  const token = req.cookies.get("__session")?.value;
+export function middleware(req: NextRequest) {
+  const token = req.cookies.get("session")?.value;
 
-  // Si no hay token, redirige al login
-  if (!token) {
+  // 🔒 Protege rutas privadas
+  if (!token && req.nextUrl.pathname.startsWith("/dashboard")) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  try {
-    await getAuth().verifyIdToken(token);
-    return NextResponse.next(); // sigue la ruta
-  } catch (error) {
-    console.error("Token inválido en middleware:", error);
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
+  return NextResponse.next();
 }
 
-// Aplica middleware a rutas privadas
+// Aplica solo a rutas que quieres proteger
 export const config = {
-  matcher: ["/dashboard/:path*", "/api/private/:path*"],
+  matcher: [
+    "/dashboard/:path*",
+    "/perfil/:path*", // puedes agregar más rutas privadas aquí
+  ],
 };
