@@ -19,7 +19,7 @@ function AutoCarousel() {
     },
     {
       title: "Gestiona finanzas en grupo",
-      description: "Comparte gastos y maneja el presupuesto con tu familia, pareja o compañeros de casa.",
+      description: "Comparte gastos y maneja el presupuesto con tu grupo de amigos o compañeros de clase.",
       icon: <span style={{ fontSize: 64, color: '#22c55e', display: 'inline-block', marginBottom: 24 }}>👥</span>
     },
     {
@@ -118,23 +118,11 @@ export default function HomePage() {
         <div className="p-10">
           <div className="flex flex-col items-start mb-8">
             <h1 className="text-3xl font-bold mb-1">
-              ¡Hola, {user.displayName || 'Usuario'}!
+              ¡Hola admin, {user.displayName || 'Usuario'}!
             </h1>
-            <p className="text-lg text-gray-400 mb-6">Resumen de tus finanzas</p>
           </div>
           <div>
-            <h2 className="text-xl font-semibold mb-4">Acciones rápidas</h2>
-            <div className="flex gap-6 mb-8">
-              <button className="flex flex-col items-center justify-center border border-gray-200 rounded-2xl px-12 py-8 bg-white hover:bg-green-50 transition w-64" type="button">
-                <span className="text-2xl mb-2">＋</span>
-                <span className="text-base font-medium text-gray-700">Agregar gasto</span>
-              </button>
-              <button className="flex flex-col items-center justify-center border border-gray-200 rounded-2xl px-12 py-8 bg-white hover:bg-green-50 transition w-64" type="button">
-                <span className="text-2xl mb-2">💳</span>
-                <span className="text-base font-medium text-gray-700">Nueva cuenta</span>
-              </button>
-            </div>
-            <h2 className="text-xl font-semibold mt-8">Reportes</h2>
+            <h2 className="text-xl font-semibold mt-8">Reportes y panel de admin</h2>
           </div>
         </div>
       )}

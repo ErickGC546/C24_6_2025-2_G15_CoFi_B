@@ -27,15 +27,33 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     try {
       const provider = new GoogleAuthProvider();
-
-      // Sugerencia para el dominio
-      provider.setCustomParameters({
-      });
+      provider.setCustomParameters({ prompt: 'select_account' }); // fuerza elegir cuenta
 
       const result = await signInWithPopup(auth, provider);
-
       const user = result.user;
+
       if (user.email && user.email.endsWith('@tecsup.edu.pe')) {
+        // 1️⃣ Obtener el token del usuario
+        const token = await user.getIdToken();
+
+        // 2️⃣ Llamar al endpoint para registrar/obtener el usuario en DB
+        const res = await fetch('/api/auth/me', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          console.error('Error en /api/auth/me', await res.text());
+          setError('Hubo un problema al registrar el usuario.');
+          return;
+        }
+
+        const userData = await res.json();
+        console.log('Usuario desde backend:', userData);
+
+        // 3️⃣ Redirigir
         router.push('/');
       } else {
         await signOut(auth);
@@ -46,7 +64,7 @@ export default function LoginPage() {
       setError('Error al iniciar sesión con Google');
     }
   };
-
+  
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white">
       <div className="w-full max-w-md">
