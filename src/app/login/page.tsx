@@ -33,10 +33,8 @@ export default function LoginPage() {
       const user = result.user;
 
       if (user.email && user.email.endsWith('@tecsup.edu.pe')) {
-        // 1️⃣ Obtener el token del usuario
         const token = await user.getIdToken();
 
-        // 2️⃣ Llamar al endpoint para registrar/obtener el usuario en DB
         const res = await fetch('/api/auth/me', {
           method: 'GET',
           headers: {
@@ -50,10 +48,8 @@ export default function LoginPage() {
           return;
         }
 
-        const userData = await res.json();
-        console.log('Usuario desde backend:', userData);
+        console.log("✅ Usuario autenticado correctamente");
 
-        // 3️⃣ Redirigir
         router.push('/');
       } else {
         await signOut(auth);

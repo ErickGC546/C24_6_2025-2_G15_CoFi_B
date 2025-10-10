@@ -8,12 +8,279 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-model User {
-  id         String   @id               // UID de Firebase
-  email      String   @unique
-  name       String?
-  avatarUrl  String?
-  role       String   @default("user")
-  fcmToken   String?
-  createdAt  DateTime @default(now())
+
+/* ENUMS */
+enum Role {
+  user
+  admin
 }
+
+enum Privacy {
+  public
+  private
+  invite_only
+}
+
+enum CategoryType {
+  expense
+  income
+  both
+}
+
+enum TransactionType {
+  expense
+  income
+  transfer
+}
+
+enum GroupMemberRole {
+  owner
+  admin
+  member
+}
+
+enum InviteStatus {
+  pending
+  accepted
+  declined
+  expired
+}
+
+enum AiRequestType {
+  summary
+  forecast
+  anomaly
+  advice
+  budget_optimization
+  spending_alert
+  goal_recommendation
+  other
+}
+
+/* MODELOS */
+
+model User {
+  id                     String                  @id @map("id") // Firebase UID
+  email                  String                  @unique
+  name                   String?
+  avatarUrl              String?                 @map("avatar_url")
+  phone                  String?
+  role                   Role                    @default(user)
+  isActive               Boolean                 @default(true) @map("is_active")
+  fcmToken               String?
+
+  // AI
+  aiMonthlyAllowance     Int                     @default(500)
+  aiCreditsRemaining     Int                     @default(500)
+  aiTotalConsumed        BigInt                  @default(0) @map("ai_total_consumed")
+
+  createdAt              DateTime                @default(now()) @map("created_at")
+  updatedAt              DateTime                @updatedAt @map("updated_at")
+
+  // Relaciones
+  groups                 Group[]                 @relation("GroupOwner")
+  groupMembers           GroupMember[]
+  groupInvitesSent       GroupInvite[]           @relation("Inviter")
+  groupInvitesReceived   GroupInvite[]           @relation("Invitee")
+  categories             Category[]
+  accounts               Account[]
+  transactions           Transaction[]
+  budgets                Budget[]
+  savingsGoals           SavingsGoal[]
+  aiUsages               AiUsage[]
+  aiCreditsTransactions  AiCreditsTransaction[]
+  aiRecommendations      AiRecommendation[]
+
+  @@index([email])
+}
+
+/* Grupos colaborativos */
+model Group {
+  id               String           @id @default(uuid()) @map("id")
+  ownerId          String?          @map("owner_id")
+  name             String
+  description      String?
+  privacy          Privacy          @default(invite_only)
+  joinCode         String?          @unique @map("join_code")
+  isArchived       Boolean          @default(false) @map("is_archived")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  owner            User?            @relation("GroupOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  groupMembers     GroupMember[]
+  groupInvites     GroupInvite[]
+  transactions     Transaction[]
+  aiRecommendations AiRecommendation[]
+
+  @@index([ownerId])
+}
+
+/* Miembros de grupo */
+model GroupMember {
+  id        String           @id @default(uuid()) @map("id")
+  groupId   String           @map("group_id")
+  userId    String           @map("user_id")
+  role      GroupMemberRole  @default(member)
+  joinedAt  DateTime         @default(now()) @map("joined_at")
+  isActive  Boolean          @default(true) @map("is_active")
+
+  group     Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+}
+
+/* Invitaciones a grupo */
+model GroupInvite {
+  id             String       @id @default(uuid()) @map("id")
+  groupId        String       @map("group_id")
+  inviterId      String?      @map("inviter_id")
+  inviteeUserId  String?      @map("invitee_user_id")
+  inviteeEmail   String?
+  token          String       @unique
+  status         InviteStatus @default(pending)
+  expiresAt      DateTime?
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  group          Group        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  inviter        User?        @relation("Inviter", fields: [inviterId], references: [id], onDelete: SetNull)
+  inviteeUser    User?        @relation("Invitee", fields: [inviteeUserId], references: [id], onDelete: SetNull)
+}
+
+/* Categorías */
+model Category {
+  id         String        @id @default(uuid()) @map("id")
+  userId     String?       @map("user_id")
+  name       String
+  type       CategoryType  @default(expense)
+  user       User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  budgets     Budget[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+/* Cuentas */
+model Account {
+  id        String      @id @default(uuid()) @map("id")
+  userId    String      @map("user_id")
+  name      String?
+  balance   Decimal     @default(0)
+  currency  String      @default("PEN")
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+}
+
+/* Movimientos */
+model Transaction {
+  id          String          @id @default(uuid()) @map("id")
+  userId      String?         @map("user_id")
+  groupId     String?         @map("group_id")
+  type        TransactionType
+  amount      Decimal
+  currency    String          @default("PEN")
+  categoryId  String?         @map("category_id")
+  accountId   String?         @map("account_id")
+  note        String?
+  occurredAt  DateTime
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime?       @map("updated_at")
+  isDeleted   Boolean         @default(false) @map("is_deleted")
+
+  user        User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  group       Group?          @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  category    Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  account     Account?        @relation(fields: [accountId], references: [id], onDelete: SetNull)
+}
+
+/* Presupuestos */
+model Budget {
+  id         String    @id @default(uuid()) @map("id")
+  userId     String    @map("user_id")
+  month      DateTime
+  amount     Decimal
+  categoryId String?
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, month, categoryId])
+}
+
+/* Metas de ahorro */
+model SavingsGoal {
+  id            String    @id @default(uuid()) @map("id")
+  userId        String    @map("user_id")
+  title         String
+  targetAmount  Decimal
+  currentAmount Decimal   @default(0)
+  targetDate    DateTime?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/* Uso de la IA */
+model AiUsage {
+  id             String        @id @default(uuid())
+  userId         String?       @map("user_id")
+  provider       String?       @default("openrouter") // puede ser "openrouter" u otro
+  requestType    AiRequestType
+  model          String
+  tokensIn       Int
+  tokensOut      Int
+  tokensTotal    Int
+  creditsCharged Int
+  costEstimateUsd Decimal?
+  inputJson      Json?
+  outputJson     Json?
+  createdAt      DateTime      @default(now())
+
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+/* Transacciones de créditos IA */
+model AiCreditsTransaction {
+  id           String    @id @default(uuid())
+  userId       String
+  change       Int       // + recarga, - consumo
+  balanceAfter Int
+  reason       String?
+  source       String?   // ej. "ai_request", "bonus"
+  createdAt    DateTime  @default(now())
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/* Recomendaciones de la IA */
+model AiRecommendation {
+  id          String    @id @default(uuid())
+  userId      String
+  groupId     String?
+  recType     String?
+  recSummary  String?
+  recFull     Json?
+  model       String?
+  score       Float?
+  generatedAt DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group       Group?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
+}
+
+/* Logs */
+model AuditLog {
+  id        String   @id @default(uuid())
+  actorId   String?
+  action    String
+  detail    Json?
+  createdAt DateTime @default(now())
+}
+
+
