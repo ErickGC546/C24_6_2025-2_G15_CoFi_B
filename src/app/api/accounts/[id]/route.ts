@@ -5,10 +5,11 @@ import "@/lib/firebaseAdmin";
 
 /* 🟠 EDITAR CUENTA */
 export async function PUT(
-  req: Request, 
-  { params }: { params: { id: string } }
+  req: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await context.params;
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -16,9 +17,7 @@ export async function PUT(
 
     const token = authHeader.split(" ")[1];
     const decoded = await getAuth().verifyIdToken(token);
-
     const { name, balance } = await req.json();
-    const id = params.id;
 
     const existing = await prisma.account.findUnique({ where: { id } });
     if (!existing || existing.userId !== decoded.uid) {
@@ -39,10 +38,11 @@ export async function PUT(
 
 /* 🔴 ELIMINAR CUENTA */
 export async function DELETE(
-  req: Request, 
-  { params }: { params: { id: string } }
+  req: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await context.params;
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -51,14 +51,11 @@ export async function DELETE(
     const token = authHeader.split(" ")[1];
     const decoded = await getAuth().verifyIdToken(token);
 
-    const id = params.id;
     const existing = await prisma.account.findUnique({ where: { id } });
-
     if (!existing || existing.userId !== decoded.uid) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
-    // Evitar eliminar si tiene transacciones asociadas
     const hasTransactions = await prisma.transaction.count({
       where: { accountId: id },
     });

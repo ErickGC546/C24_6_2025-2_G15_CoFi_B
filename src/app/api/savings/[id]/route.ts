@@ -5,8 +5,8 @@ import "@/lib/firebaseAdmin";
 
 /* 🟠 ACTUALIZAR meta */
 export async function PUT(
-  req: Request, 
-  { params }: { params: { id: string } }
+  req: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const authHeader = req.headers.get("authorization");
@@ -18,14 +18,14 @@ export async function PUT(
     const { title, targetAmount, currentAmount, targetDate } = await req.json();
 
     const existing = await prisma.savingsGoal.findUnique({
-      where: { id: params.id },
+      where: { id: (await context.params).id },
     });
 
     if (!existing || existing.userId !== decoded.uid)
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
     const updated = await prisma.savingsGoal.update({
-      where: { id: params.id },
+      where: { id: (await context.params).id },
       data: { title, targetAmount, currentAmount, targetDate },
     });
 
@@ -38,8 +38,8 @@ export async function PUT(
 
 /* 🔴 ELIMINAR meta */
 export async function DELETE(
-  req: Request, 
-  { params }: { params: { id: string } }
+  req: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const authHeader = req.headers.get("authorization");
@@ -50,18 +50,18 @@ export async function DELETE(
     const decoded = await getAuth().verifyIdToken(token);
 
     const existing = await prisma.savingsGoal.findUnique({
-      where: { id: params.id },
+      where: { id: (await context.params).id },
     });
 
     if (!existing || existing.userId !== decoded.uid)
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
-    await prisma.savingsGoal.delete({ where: { id: params.id } });
+    await prisma.savingsGoal.delete({ where: { id: (await context.params).id } });
     await prisma.auditLog.create({
       data: {
         actorId: decoded.uid,
         action: "Eliminó una meta de ahorro",
-        detail: { id: params.id },
+        detail: { id: (await context.params).id },
       },
     });
 
@@ -75,8 +75,8 @@ export async function DELETE(
 
 /* 🟣 DETALLE de una meta */
 export async function GET(
-  req: Request, 
-  { params }: { params: { id: string } }
+  req: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const authHeader = req.headers.get("authorization");
@@ -87,7 +87,7 @@ export async function GET(
     const decoded = await getAuth().verifyIdToken(token);
 
     const goal = await prisma.savingsGoal.findUnique({
-      where: { id: params.id },
+      where: { id: (await context.params).id },
     });
 
     if (!goal || goal.userId !== decoded.uid)

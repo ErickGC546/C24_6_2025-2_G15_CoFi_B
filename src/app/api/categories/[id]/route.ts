@@ -5,8 +5,8 @@ import "@/lib/firebaseAdmin";
 
 /* EDITAR categoría */
 export async function PUT(
-  req: Request, 
-  { params }: { params: { id: string } }
+  req: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const authHeader = req.headers.get("authorization");
@@ -21,7 +21,7 @@ export async function PUT(
     const { name, type } = await req.json();
 
     const existing = await prisma.category.findUnique({
-      where: { id: params.id },
+      where: { id: (await context.params).id },
     });
 
     if (!existing || existing.userId !== userId) {
@@ -29,7 +29,7 @@ export async function PUT(
     }
 
     const updated = await prisma.category.update({
-      where: { id: params.id },
+      where: { id: (await context.params).id },
       data: { name, type },
     });
 
@@ -42,8 +42,8 @@ export async function PUT(
 
 /* ELIMINAR categoría */
 export async function DELETE(
-  req: Request, 
-  { params }: { params: { id: string } }
+  req: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const authHeader = req.headers.get("authorization");
@@ -56,14 +56,14 @@ export async function DELETE(
     const userId = decoded.uid;
 
     const existing = await prisma.category.findUnique({
-      where: { id: params.id },
+      where: { id: (await context.params).id },
     });
 
     if (!existing || existing.userId !== userId) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
-    await prisma.category.delete({ where: { id: params.id } });
+    await prisma.category.delete({ where: { id: (await context.params).id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {

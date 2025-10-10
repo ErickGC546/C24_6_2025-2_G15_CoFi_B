@@ -3,12 +3,12 @@ import { prisma } from "@/lib/prisma";
 import "@/lib/firebaseAdmin";
 
 export async function GET(
-  req: Request, 
-  { params }: { params: { id: string } }
+  req: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const group = await prisma.group.findUnique({
-      where: { id: params.id },
+      where: { id: (await context.params).id },
       include: { groupMembers: { include: { user: true } } },
     });
     if (!group) return NextResponse.json({ error: "Grupo no encontrado" }, { status: 404 });
@@ -20,13 +20,13 @@ export async function GET(
 }
 
 export async function PUT(
-  req: Request, 
-  { params }: { params: { id: string } }
+   req: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { name, description, privacy } = await req.json();
     const updated = await prisma.group.update({
-      where: { id: params.id },
+      where: { id: (await context.params).id },
       data: { name, description, privacy },
     });
     return NextResponse.json(updated);
@@ -37,11 +37,11 @@ export async function PUT(
 }
 
 export async function DELETE(
-  req: Request, 
-  { params }: { params: { id: string } }
+  req: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    await prisma.group.delete({ where: { id: params.id } });
+    await prisma.group.delete({ where: { id: (await context.params).id } });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error en DELETE /groups/[id]:", error);

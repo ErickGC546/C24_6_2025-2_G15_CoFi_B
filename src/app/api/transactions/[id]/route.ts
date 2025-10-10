@@ -5,8 +5,8 @@ import "@/lib/firebaseAdmin";
 
 /* 🟠 EDITAR transacción */
 export async function PUT(
-  req: Request, 
-  { params }: { params: { id: string } }
+  req: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const authHeader = req.headers.get("authorization");
@@ -16,7 +16,7 @@ export async function PUT(
 
     const token = authHeader.split(" ")[1];
     const decoded = await getAuth().verifyIdToken(token);
-    const id = params.id;
+    const id = (await context.params).id;
 
     const { amount, note, categoryId, type } = await req.json();
 
@@ -47,7 +47,7 @@ export async function PUT(
 /* 🔴 ELIMINAR transacción */
 export async function DELETE(
   req: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const authHeader = req.headers.get("authorization");
@@ -57,7 +57,7 @@ export async function DELETE(
 
     const token = authHeader.split(" ")[1];
     const decoded = await getAuth().verifyIdToken(token);
-    const id = params.id;
+    const id = (await context.params).id;
 
     const existing = await prisma.transaction.findUnique({ where: { id } });
     if (!existing || existing.userId !== decoded.uid) {

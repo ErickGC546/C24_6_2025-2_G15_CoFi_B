@@ -5,8 +5,8 @@ import "@/lib/firebaseAdmin";
 
 /* 🟣 OBTENER presupuesto por ID */
 export async function GET(
-  req: Request, 
-  { params }: { params: { id: string } }
+  req: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = req.headers.get("authorization")?.split(" ")[1];
@@ -15,7 +15,7 @@ export async function GET(
     const decoded = await getAuth().verifyIdToken(token);
 
     const budget = await prisma.budget.findUnique({
-      where: { id: params.id },
+      where: { id: (await context.params).id },
       include: { category: true },
     });
 
@@ -31,8 +31,8 @@ export async function GET(
 
 /* 🟠 EDITAR presupuesto */
 export async function PUT(
-  req: Request, 
-  { params }: { params: { id: string } }
+  req: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = req.headers.get("authorization")?.split(" ")[1];
@@ -41,12 +41,12 @@ export async function PUT(
     const decoded = await getAuth().verifyIdToken(token);
     const { amount, categoryId } = await req.json();
 
-    const existing = await prisma.budget.findUnique({ where: { id: params.id } });
+    const existing = await prisma.budget.findUnique({ where: { id: (await context.params).id } });
     if (!existing || existing.userId !== decoded.uid)
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
     const updated = await prisma.budget.update({
-      where: { id: params.id },
+      where: { id: (await context.params).id },
       data: { amount, categoryId },
     });
 
@@ -59,8 +59,8 @@ export async function PUT(
 
 /* 🔴 ELIMINAR presupuesto */
 export async function DELETE(
-  req: Request, 
-  { params }: { params: { id: string } }
+  req: Request,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = req.headers.get("authorization")?.split(" ")[1];
@@ -68,11 +68,11 @@ export async function DELETE(
 
     const decoded = await getAuth().verifyIdToken(token);
 
-    const existing = await prisma.budget.findUnique({ where: { id: params.id } });
+    const existing = await prisma.budget.findUnique({ where: { id: (await context.params).id } });
     if (!existing || existing.userId !== decoded.uid)
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
-    await prisma.budget.delete({ where: { id: params.id } });
+    await prisma.budget.delete({ where: { id: (await context.params).id } });
 
     return NextResponse.json({ success: true });
   } catch (error) {
