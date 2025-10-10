@@ -4,7 +4,10 @@ import { prisma } from "@/lib/prisma";
 import "@/lib/firebaseAdmin";
 
 /* 🟠 EDITAR transacción */
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(
+  req: Request, 
+  { params }: { params: { id: string } }
+) {
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -42,7 +45,10 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 }
 
 /* 🔴 ELIMINAR transacción */
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {

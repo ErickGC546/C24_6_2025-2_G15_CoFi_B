@@ -3,8 +3,11 @@ import { getAuth } from "firebase-admin/auth";
 import { prisma } from "@/lib/prisma";
 import "@/lib/firebaseAdmin";
 
-/* ✏️ EDITAR categoría */
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+/* EDITAR categoría */
+export async function PUT(
+  req: Request, 
+  { params }: { params: { id: string } }
+) {
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -37,8 +40,11 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-/* 🗑 ELIMINAR categoría */
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+/* ELIMINAR categoría */
+export async function DELETE(
+  req: Request, 
+  { params }: { params: { id: string } }
+) {
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {

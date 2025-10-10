@@ -2,7 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import "@/lib/firebaseAdmin";
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  req: Request, 
+  { params }: { params: { id: string } }
+) {
   try {
     const group = await prisma.group.findUnique({
       where: { id: params.id },
@@ -16,7 +19,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(
+  req: Request, 
+  { params }: { params: { id: string } }
+) {
   try {
     const { name, description, privacy } = await req.json();
     const updated = await prisma.group.update({
@@ -30,7 +36,10 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(
+  req: Request, 
+  { params }: { params: { id: string } }
+) {
   try {
     await prisma.group.delete({ where: { id: params.id } });
     return NextResponse.json({ success: true });

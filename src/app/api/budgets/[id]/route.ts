@@ -4,7 +4,10 @@ import { prisma } from "@/lib/prisma";
 import "@/lib/firebaseAdmin";
 
 /* 🟣 OBTENER presupuesto por ID */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  req: Request, 
+  { params }: { params: { id: string } }
+) {
   try {
     const token = req.headers.get("authorization")?.split(" ")[1];
     if (!token) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -27,7 +30,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 }
 
 /* 🟠 EDITAR presupuesto */
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(
+  req: Request, 
+  { params }: { params: { id: string } }
+) {
   try {
     const token = req.headers.get("authorization")?.split(" ")[1];
     if (!token) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -52,7 +58,10 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 }
 
 /* 🔴 ELIMINAR presupuesto */
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(
+  req: Request, 
+  { params }: { params: { id: string } }
+) {
   try {
     const token = req.headers.get("authorization")?.split(" ")[1];
     if (!token) return NextResponse.json({ error: "No autorizado" }, { status: 401 });

@@ -61,7 +61,7 @@ export async function GET(req: Request) {
       totalBalance,
       budget: budget?.amount ?? 0,
       budgetUsed: totalExpense,
-      remainingBudget: (budget?.amount ?? 0) - totalExpense,
+      remainingBudget: Number(budget?.amount ?? 0) - totalExpense,
     });
   } catch (error) {
     console.error("Error en /api/summary:", error);

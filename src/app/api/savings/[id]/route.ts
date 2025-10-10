@@ -4,7 +4,10 @@ import { prisma } from "@/lib/prisma";
 import "@/lib/firebaseAdmin";
 
 /* 🟠 ACTUALIZAR meta */
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(
+  req: Request, 
+  { params }: { params: { id: string } }
+) {
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer "))
@@ -34,7 +37,10 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 }
 
 /* 🔴 ELIMINAR meta */
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(
+  req: Request, 
+  { params }: { params: { id: string } }
+) {
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer "))
@@ -68,7 +74,10 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 }
 
 /* 🟣 DETALLE de una meta */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  req: Request, 
+  { params }: { params: { id: string } }
+) {
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer "))
