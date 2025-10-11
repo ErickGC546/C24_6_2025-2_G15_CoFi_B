@@ -14,7 +14,7 @@ export async function GET(req: Request) {
 
     const token = authHeader.split(" ")[1];
 
-    // ✅ Verificar el token de Firebase
+    // ✅ Verificar token de Firebase
     let decodedToken;
     try {
       decodedToken = await getAuth().verifyIdToken(token);
@@ -23,9 +23,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Token inválido" }, { status: 401 });
     }
 
-    // ✅ Buscar el usuario en la base de datos
-    const user = await prisma.user.findUnique({
-      where: { id: decodedToken.uid },
+    const { uid, email, name, picture } = decodedToken;
+
+    // ✅ Buscar usuario en DB
+    let user = await prisma.user.findUnique({
+      where: { id: uid },
       select: {
         id: true,
         email: true,
@@ -38,14 +40,22 @@ export async function GET(req: Request) {
       },
     });
 
+    // 🆕 Si no existe, crearlo automáticamente
     if (!user) {
-      return NextResponse.json(
-        { error: "Usuario no registrado en la base de datos" },
-        { status: 404 }
-      );
+      user = await prisma.user.create({
+        data: {
+          id: uid,
+          email: email || "",
+          name: name || "",
+          avatarUrl: picture || "",
+          role: "user",
+          aiCreditsRemaining: 3, // créditos iniciales de IA
+          aiMonthlyAllowance: 3,
+        },
+      });
     }
 
-    // ✅ Evitar error con BigInt en JSON
+    // ✅ Evitar error con BigInt al serializar
     const safeUser = JSON.parse(
       JSON.stringify(user, (_, value) =>
         typeof value === "bigint" ? Number(value) : value
@@ -55,6 +65,9 @@ export async function GET(req: Request) {
     return NextResponse.json(safeUser, { status: 200 });
   } catch (error) {
     console.error("💥 Error en /api/auth/me:", error);
-    return NextResponse.json({ error: "Error interno del servidor" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Error interno del servidor" },
+      { status: 500 }
+    );
   }
 }
