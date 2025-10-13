@@ -52,15 +52,15 @@ export async function POST(req: Request) {
           let resp = "No se recibió respuesta de la IA.";
           const out = existing.outputJson;
           if (out && typeof out === "object" && !Array.isArray(out) && "message" in out) {
-            // @ts-ignore access dynamic JSON
-            resp = (out as Record<string, any>).message ?? resp;
+            const m = (out as Record<string, unknown>)["message"];
+            if (typeof m === "string") resp = m;
           } else if (typeof out === "string") {
             resp = out;
           }
           return NextResponse.json({ response: resp });
         }
-      } catch (e) {
-        console.warn("Idempotency check failed, continuing:", e);
+      } catch (err: unknown) {
+        console.warn("Idempotency check failed, continuing:", err);
       }
     }
 
@@ -80,16 +80,16 @@ export async function POST(req: Request) {
         let resp = "No se recibió respuesta de la IA.";
         const out = recent.outputJson;
         if (out && typeof out === "object" && !Array.isArray(out) && "message" in out) {
-          // @ts-ignore access dynamic JSON
-          resp = (out as Record<string, any>).message ?? resp;
+          const m = (out as Record<string, unknown>)["message"];
+          if (typeof m === "string") resp = m;
         } else if (typeof out === "string") {
           resp = out;
         }
         return NextResponse.json({ response: resp });
       }
-    } catch (e) {
+    } catch (err: unknown) {
       // Si el proveedor de la base de datos no soporta consultas JSON comparativas, ignoramos la deduplicación y seguimos.
-      console.warn("Dedup check failed, continuing:", e);
+      console.warn("Dedup check failed, continuing:", err);
     }
 
     const aiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -116,7 +116,7 @@ export async function POST(req: Request) {
     // 🧾 Guardar en la base de datos en una transacción atómica: crear AiUsage, crear AiCreditsTransaction y actualizar saldo del usuario.
     const creditsToCharge = 1;
     try {
-      const usage = await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx) => {
         const user = await tx.user.findUnique({ where: { id: userId } });
         if (!user) throw new Error("Usuario no encontrado");
         if (user.aiCreditsRemaining < creditsToCharge) {
@@ -161,11 +161,11 @@ export async function POST(req: Request) {
       });
 
       return NextResponse.json({ response: message });
-    } catch (e: any) {
-      if (e.message && e.message.includes("No tienes créditos")) {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.includes("No tienes créditos")) {
         return NextResponse.json({ error: "No tienes créditos de IA suficientes" }, { status: 402 });
       }
-      throw e;
+      throw err;
     }
   } catch (error) {
     console.error("Error en /api/ai/request:", error);
