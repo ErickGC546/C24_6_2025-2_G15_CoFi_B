@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { User as FirebaseUser } from 'firebase/auth';
-import { getAuth as getClientAuth } from 'firebase/auth';
 
 const AUTO_CAROUSEL_INTERVAL = 3500;
 
