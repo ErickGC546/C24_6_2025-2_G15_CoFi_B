@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { User as FirebaseUser } from 'firebase/auth';
+import Image from 'next/image';
 
 const AUTO_CAROUSEL_INTERVAL = 3500;
 
@@ -99,9 +100,18 @@ function AutoCarousel() {
   );
 }
 
+interface RecentUser {
+  id: string;
+  email: string;
+  name?: string | null;
+  role: string;
+  avatarUrl?: string | null;
+  createdAt: string;
+}
+
 export default function HomePage() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [recentUsers, setRecentUsers] = useState<Array<any>>([]);
+  const [recentUsers, setRecentUsers] = useState<RecentUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
   useEffect(() => {
@@ -187,7 +197,6 @@ export default function HomePage() {
                 <div>
                   <p className="text-sm text-gray-500">Gastos este mes</p>
                   <p className="text-2xl font-semibold text-gray-900">S/ {mockKpis.totalExpensesMonth.toFixed(2)}</p>
-                  <p className="text-xs text-gray-400">Nuevo mes — sin transacciones</p>
                 </div>
               </div>
               <div className="bg-white rounded-lg shadow-md p-4 flex items-center space-x-4">
@@ -217,12 +226,14 @@ export default function HomePage() {
                     {loadingUsers ? (
                       <tr><td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">Cargando usuarios...</td></tr>
                     ) : recentUsers.length ? (
-                      recentUsers.map((u: any) => (
+                      recentUsers.map((u) => (
                         <tr key={u.id} className="border-t hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-3 text-sm text-gray-700">{new Date(u.createdAt).toLocaleDateString()}</td>
                           <td className="px-4 py-3 text-sm text-gray-700 flex items-center space-x-3">
                             {u.avatarUrl ? (
-                              <img src={u.avatarUrl} alt={u.name || u.email} className="w-8 h-8 rounded-full object-cover" />
+                              <div className="relative w-8 h-8 rounded-full overflow-hidden">
+                                <Image src={u.avatarUrl} alt={u.name || u.email || ''} width={32} height={32} className="object-cover" />
+                              </div>
                             ) : (
                               <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm text-gray-600">{(u.name || u.email || '').charAt(0).toUpperCase()}</div>
                             )}
