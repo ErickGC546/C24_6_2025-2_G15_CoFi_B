@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { User as FirebaseUser } from 'firebase/auth';
+import { getAuth as getClientAuth } from 'firebase/auth';
 
 const AUTO_CAROUSEL_INTERVAL = 3500;
 
@@ -101,6 +102,8 @@ function AutoCarousel() {
 
 export default function HomePage() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [recentUsers, setRecentUsers] = useState<Array<any>>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -109,6 +112,48 @@ export default function HomePage() {
 
     return () => unsubscribe();
   }, []);
+
+  // Datos mock simples para el panel de administración (KPIs)
+  const mockKpis = {
+    totalUsers: 2,
+    totalExpensesMonth: 0,
+    activeGroups: 0,
+  };
+
+  // Fetch usuarios recientes cuando haya user y sea admin (cliente)
+  useEffect(() => {
+    async function loadRecentUsers() {
+      if (!user) return;
+      try {
+        setLoadingUsers(true);
+        const token = await auth.currentUser?.getIdToken();
+        if (!token && process.env.NODE_ENV === 'production') {
+          console.error('No hay token de autenticación');
+          setRecentUsers([]);
+          return;
+        }
+
+        // Usar ruta relativa (Next la resolverá) o absoluta si necesitas otra origin
+        const res = await fetch('/api/admin/users/recent', {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setRecentUsers(data);
+        } else {
+          console.error('No autorizado o error al obtener usuarios', await res.text());
+          setRecentUsers([]);
+        }
+      } catch (err) {
+        console.error('Error cargando usuarios recientes', err);
+        setRecentUsers([]);
+      } finally {
+        setLoadingUsers(false);
+      }
+    }
+
+    loadRecentUsers();
+  }, [user]);
 
   return (
     <>
@@ -123,6 +168,85 @@ export default function HomePage() {
           </div>
           <div>
             <h2 className="text-xl font-semibold mt-8">Reportes y panel de admin</h2>
+            <p className="text-gray-600 mt-2">Aquí puedes ver y gestionar los reportes de usuarios y actividades.</p>
+            {/* Panel básico de administración: KPIs y transacciones recientes (mock) */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white rounded-lg shadow-md p-4 flex items-center space-x-4">
+                <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center">
+                  <span className="text-2xl">👥</span>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Usuarios</p>
+                  <p className="text-2xl font-semibold text-gray-900">{mockKpis.totalUsers}</p>
+                  <p className="text-xs text-gray-400">Totales registrados</p>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg shadow-md p-4 flex items-center space-x-4">
+                <div className="w-12 h-12 rounded-full bg-yellow-50 flex items-center justify-center">
+                  <span className="text-2xl">💸</span>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Gastos este mes</p>
+                  <p className="text-2xl font-semibold text-gray-900">S/ {mockKpis.totalExpensesMonth.toFixed(2)}</p>
+                  <p className="text-xs text-gray-400">Nuevo mes — sin transacciones</p>
+                </div>
+              </div>
+              <div className="bg-white rounded-lg shadow-md p-4 flex items-center space-x-4">
+                <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center">
+                  <span className="text-2xl">👥</span>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Grupos activos</p>
+                  <p className="text-2xl font-semibold text-gray-900">{mockKpis.activeGroups}</p>
+                  <p className="text-xs text-gray-400">Grupos con actividad reciente</p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-8">
+              <h3 className="text-lg font-medium mb-2">Usuarios registrados recientemente</h3>
+              <div className="overflow-x-auto bg-white rounded-lg shadow">
+                <table className="min-w-full text-left">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600">Fecha</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600">Usuario</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600">Rol</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingUsers ? (
+                      <tr><td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">Cargando usuarios...</td></tr>
+                    ) : recentUsers.length ? (
+                      recentUsers.map((u: any) => (
+                        <tr key={u.id} className="border-t hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3 text-sm text-gray-700">{new Date(u.createdAt).toLocaleDateString()}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700 flex items-center space-x-3">
+                            {u.avatarUrl ? (
+                              <img src={u.avatarUrl} alt={u.name || u.email} className="w-8 h-8 rounded-full object-cover" />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-sm text-gray-600">{(u.name || u.email || '').charAt(0).toUpperCase()}</div>
+                            )}
+                            <div>
+                              <div className="font-medium text-gray-900">{u.name || 'Sin nombre'}</div>
+                              <div className="text-xs text-gray-400">{u.email}</div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${u.role === 'admin' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                              {u.role}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900">S/ 0.00</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr><td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">No hay usuarios recientes para mostrar.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       )}
