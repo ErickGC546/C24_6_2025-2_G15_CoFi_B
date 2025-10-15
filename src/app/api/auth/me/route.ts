@@ -49,8 +49,8 @@ export async function GET(req: Request) {
           name: name || "",
           avatarUrl: picture || "",
           role: "user",
-          aiCreditsRemaining: 3, // créditos iniciales de IA
-          aiMonthlyAllowance: 3,
+          aiCreditsRemaining: 500, // créditos iniciales de IA
+          aiMonthlyAllowance: 500,
         },
       });
     }
