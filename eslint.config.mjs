@@ -10,6 +10,9 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
+  // Skip linting for generated Prisma runtime files which intentionally contain
+  // patterns that trigger many ESLint rules (bundled/compiled code).
+  { ignores: ["src/generated/**"] },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
 ];
 

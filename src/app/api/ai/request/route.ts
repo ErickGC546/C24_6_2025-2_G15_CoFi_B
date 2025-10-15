@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import "@/lib/firebaseAdmin";
 
 export async function POST(req: Request) {
@@ -56,33 +57,44 @@ export async function POST(req: Request) {
         });
         if (existing) {
           // Normalizar la salida a texto si es posible
-          const normalize = (out: any) => {
-                  try {
-                    if (!out) return null;
-                    if (typeof out === "string") return out;
-                    if (out.message && typeof out.message === "string") return out.message;
-                    if (out.outputText && typeof out.outputText === "string") return out.outputText;
-                    // Si es un objeto con raw/message
-                    if (out.raw) {
-                      // intentar extraer texto de estructuras comunes
-                      if (typeof out.raw === "string") return out.raw;
-                      if (out.raw.choices && Array.isArray(out.raw.choices) && out.raw.choices[0]) {
-                        const c = out.raw.choices[0];
-                        if (c.message && c.message.content) return c.message.content;
-                        if (c.text) return c.text;
+          const normalize = (out: unknown): string | null => {
+            try {
+              if (!out) return null;
+              if (typeof out === "string") return out;
+              if (typeof out === "object" && out !== null) {
+                const obj = out as Record<string, unknown>;
+                if (typeof obj.message === "string") return obj.message;
+                if (typeof obj.outputText === "string") return obj.outputText;
+                if ("raw" in obj) {
+                  const raw = obj.raw;
+                  if (typeof raw === "string") return raw;
+                  if (typeof raw === "object" && raw !== null) {
+                    const r = raw as Record<string, unknown>;
+                    if (Array.isArray(r.choices) && r.choices.length > 0) {
+                      const c0 = r.choices[0];
+                      if (typeof c0 === "object" && c0 !== null) {
+                        const cObj = c0 as Record<string, unknown>;
+                        if (typeof cObj.message === "object" && cObj.message !== null) {
+                          const m = cObj.message as Record<string, unknown>;
+                          if (typeof m.content === "string") return m.content;
+                        }
+                        if (typeof cObj.text === "string") return cObj.text;
                       }
                     }
-                    return null;
-                  } catch (e) {
-                    return null;
                   }
-                };
+                }
+              }
+              return null;
+            } catch {
+              return null;
+            }
+          };
           const norm = normalize(existing.outputJson);
           // Debug log: idempotency hit
           try {
             console.log("[AI] idempotency hit for user", userId, "key", idempoKey, "normalizedResponseExists", !!norm);
             console.log("[AI] existing.outputJson (truncated):", JSON.stringify(existing.outputJson)?.slice(0, 1000));
-          } catch (e) {
+          } catch {
             /* ignore logging errors */
           }
           return NextResponse.json({ response: norm ?? "No se recibió respuesta de la IA." });
@@ -124,40 +136,70 @@ export async function POST(req: Request) {
     // Llamar al proveedor por cada mensaje y recolectar respuestas. No grabamos nada hasta que todas las respuestas sean válidas.
     const modelName = "google/gemini-2.0-flash-exp:free";
 
-    const extractText = (data: any) => {
+  const extractText = (data: unknown): string | null => {
       // Intentar varias rutas comunes para extraer texto
       try {
         if (!data) return null;
-        if (data.choices && Array.isArray(data.choices) && data.choices.length > 0) {
-          const c = data.choices[0];
-          if (c.message && (c.message.content || c.message?.content)) return c.message.content || c.message?.content;
-          if (typeof c.content === "string") return c.content;
-          // algunas APIs retornan content como array
-          if (Array.isArray(c.content) && c.content.length > 0) {
-            if (typeof c.content[0] === "string") return c.content[0];
-            if (c.content[0].text) return c.content[0].text;
+
+        // Caso: top-level `choices` array (common in OpenAI-like responses)
+        if (typeof data === 'object' && data !== null && 'choices' in data) {
+          const d = data as Record<string, unknown>;
+          const choices = d.choices;
+          if (Array.isArray(choices) && choices.length > 0) {
+            const c = choices[0] as Record<string, unknown>;
+            if (c && typeof c === 'object') {
+              const msg = c.message as Record<string, unknown> | undefined;
+              if (msg && (typeof msg.content === 'string')) return msg.content;
+              if (typeof c.content === 'string') return c.content;
+              if (Array.isArray(c.content) && c.content.length > 0) {
+                const first = c.content[0];
+                if (typeof first === 'string') return first;
+                if (typeof first === 'object' && first !== null) {
+                  const fo = first as Record<string, unknown>;
+                  if (typeof fo.text === 'string') return fo.text;
+                }
+              }
+              if (typeof c.text === 'string') return c.text;
+            }
           }
-          if (c.text) return c.text;
         }
-        if (data.output && Array.isArray(data.output) && data.output.length > 0) {
-          const o0 = data.output[0];
-          if (o0.content && Array.isArray(o0.content) && o0.content.length > 0) {
-            return o0.content.map((p: any) => p.text || p).join("\n");
+
+        // Caso: `output` array with `content` entries (some providers)
+        if (typeof data === 'object' && data !== null) {
+          const dobj = data as Record<string, unknown>;
+          const output = dobj.output;
+          if (Array.isArray(output) && output.length > 0) {
+            const o0 = output[0] as Record<string, unknown>;
+            const content = o0.content;
+            if (Array.isArray(content) && content.length > 0) {
+              return content.map((p) => {
+                if (typeof p === 'string') return p;
+                if (typeof p === 'object' && p !== null) {
+                  const po = p as Record<string, unknown>;
+                  return (typeof po.text === 'string' ? po.text : JSON.stringify(po));
+                }
+                return String(p);
+              }).join('\n');
+            }
           }
         }
+
         // Fallbacks:
-        if (typeof data === "string") return data;
-        if (data.message && typeof data.message === "string") return data.message;
+        if (typeof data === 'string') return data;
+        if (typeof data === 'object' && data !== null) {
+          const d = data as Record<string, unknown>;
+          if (typeof d.message === 'string') return d.message;
+        }
         return null;
-      } catch (err) {
-        console.warn("extractText error", err);
+      } catch {
+        console.warn('extractText error');
         return null;
       }
     };
 
-    const aiResults: Array<{ input: string; outputRaw: any; outputText: string | null; ok: boolean; status?: number }> = [];
+  const aiResults: Array<{ input: string; outputRaw: unknown; outputText: string | null; ok: boolean; status?: number }> = [];
 
-    for (const m of messages) {
+  for (const m of messages) {
       const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -176,10 +218,10 @@ export async function POST(req: Request) {
         }),
       });
 
-      let parsed: any = null;
+      let parsed: unknown = null;
       try {
         parsed = await res.json();
-      } catch (err) {
+      } catch {
         parsed = null;
       }
 
@@ -187,7 +229,7 @@ export async function POST(req: Request) {
       try {
         console.log('[AI] provider response status=', res.status, 'for input truncated:', m?.slice?.(0,100));
         console.log('[AI] provider parsed (truncated):', JSON.stringify(parsed)?.slice(0,2000));
-      } catch (e) {
+      } catch {
         /* ignore logging errors */
       }
 
@@ -196,13 +238,13 @@ export async function POST(req: Request) {
     }
 
     // Si alguna de las consultas no devolvió texto útil, no cobramos y devolvemos error al cliente
-    const failed = aiResults.filter(r => !r.ok);
+  const failed = aiResults.filter(r => !r.ok);
     if (failed.length > 0) {
       console.error("AI provider returned incomplete results", failed.map(f => ({ status: f.status, input: f.input })));
       // adicional logging para diagnostico
       try {
         console.log('[AI] aiResults (truncated):', JSON.stringify(aiResults)?.slice(0,2000));
-      } catch (e) {}
+      } catch {}
       return NextResponse.json({ error: "El proveedor de IA no devolvió respuesta válida para una o más consultas" }, { status: 502 });
     }
 
@@ -229,7 +271,7 @@ export async function POST(req: Request) {
               tokensTotal: 0,
               creditsCharged: 1,
               inputJson: { userMessage: r.input, ...(idempoKey ? { idempotencyKey: idempoKey } : {}) },
-              outputJson: { message: r.outputText, raw: r.outputRaw },
+              outputJson: { message: r.outputText, raw: r.outputRaw as Prisma.InputJsonValue },
             },
           });
         }
@@ -255,7 +297,7 @@ export async function POST(req: Request) {
       });
 
       // Debug: log success
-      try { console.log('[AI] success aiResults (truncated):', JSON.stringify(aiResults)?.slice(0,2000)); } catch (e) {}
+  try { console.log('[AI] success aiResults (truncated):', JSON.stringify(aiResults)?.slice(0,2000)); } catch {}
       // Devolver respuestas: si fue una sola consulta, devolver string; si múltiples, array
       if (aiResults.length === 1) {
         return NextResponse.json({ response: aiResults[0].outputText });
