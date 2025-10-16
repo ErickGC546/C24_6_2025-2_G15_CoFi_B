@@ -203,7 +203,7 @@ export async function POST(req: Request) {
     const callProviderWithRetries = async (prompt: string) => {
       const MAX_RETRIES = 3;
       let attempt = 0;
-      let lastParsed: any = null;
+  let lastParsed: unknown = null;
       let lastStatus = 0;
 
       while (attempt < MAX_RETRIES) {
@@ -226,8 +226,8 @@ export async function POST(req: Request) {
           }),
         });
 
-        let parsed: any = null;
-        try { parsed = await res.json(); } catch (err) { parsed = null; }
+  let parsed: unknown = null;
+  try { parsed = await res.json(); } catch { parsed = null; }
         lastParsed = parsed;
         lastStatus = res.status;
 
@@ -235,7 +235,7 @@ export async function POST(req: Request) {
         try {
           console.log('[AI] provider response status=', res.status, 'for input truncated:', prompt?.slice?.(0,100));
           console.log('[AI] provider parsed (truncated):', JSON.stringify(parsed)?.slice(0,2000));
-        } catch (e) {}
+        } catch {}
 
         const text = extractText(parsed) || null;
 
@@ -245,7 +245,20 @@ export async function POST(req: Request) {
         }
 
         // Check provider-level error code inside parsed
-        const providerCode = parsed?.error?.code ?? null;
+        const getProviderErrorCode = (p: unknown): number | null => {
+          if (!p || typeof p !== 'object') return null;
+          const o = p as Record<string, unknown>;
+          const err = o['error'];
+          if (!err || typeof err !== 'object') return null;
+          const code = (err as Record<string, unknown>)['code'];
+          if (typeof code === 'number') return code;
+          if (typeof code === 'string') {
+            const n = parseInt(code);
+            return isNaN(n) ? null : n;
+          }
+          return null;
+        };
+        const providerCode = getProviderErrorCode(parsed);
 
         // If rate-limited (429) or server error (5xx), consider retrying
         const shouldRetry = (res.status === 429 || providerCode === 429) || (res.status >= 500 && res.status < 600);
@@ -256,7 +269,7 @@ export async function POST(req: Request) {
         }
 
         // If we should retry and haven't exhausted attempts, wait with exponential backoff
-        if (attempt < MAX_RETRIES) {
+          if (attempt < MAX_RETRIES) {
           // Prefer Retry-After header if present
           let waitMs = 500 * Math.pow(2, attempt - 1); // 500ms, 1000ms, 2000ms
           try {
@@ -265,7 +278,7 @@ export async function POST(req: Request) {
               const raSec = parseInt(ra);
               if (!isNaN(raSec)) waitMs = Math.max(waitMs, raSec * 1000);
             }
-          } catch (e) {}
+          } catch {}
           await new Promise((r) => setTimeout(r, waitMs));
           continue; // retry
         }
@@ -297,21 +310,64 @@ export async function POST(req: Request) {
       if (any429) {
         // Intentar extraer Retry-After desde outputRaw
         let retryAfterSec: number | null = null;
+        const getRetryAfterSecFromRaw = (raw: unknown): number | null => {
+          if (!raw || typeof raw !== 'object') return null;
+          const o = raw as Record<string, unknown>;
+
+          const tryHeaders = (hdrs: unknown): number | null => {
+            if (!hdrs || typeof hdrs !== 'object') return null;
+            const h = hdrs as Record<string, unknown>;
+            const v = h['retry-after'] ?? h['Retry-After'];
+            if (v === undefined || v === null) return null;
+            const n = parseInt(String(v));
+            return isNaN(n) ? null : n;
+          };
+
+          // top-level headers
+          const top = tryHeaders(o['headers']);
+          if (top) return top;
+
+          // maybe wrapped in response.headers
+          const resp = o['response'];
+          if (resp && typeof resp === 'object') {
+            const maybe = tryHeaders((resp as Record<string, unknown>)['headers']);
+            if (maybe) return maybe;
+          }
+
+          return null;
+        };
+
+        const getMetadataRaw = (raw: unknown): unknown | null => {
+          if (!raw || typeof raw !== 'object') return null;
+          const o = raw as Record<string, unknown>;
+          const err = o['error'];
+          if (err && typeof err === 'object') {
+            const meta = (err as Record<string, unknown>)['metadata'];
+            if (meta && typeof meta === 'object') {
+              const r = (meta as Record<string, unknown>)['raw'];
+              if (r !== undefined) return r;
+            }
+          }
+          const meta2 = o['metadata'];
+          if (meta2 && typeof meta2 === 'object') {
+            const r2 = (meta2 as Record<string, unknown>)['raw'];
+            if (r2 !== undefined) return r2;
+          }
+          return null;
+        };
+
         try {
           for (const f of failed) {
-            const raw = f.outputRaw as any;
-            const raHeader = raw?.headers?.['retry-after'] ?? raw?.headers?.['Retry-After'] ?? null;
-            if (raHeader) {
-              const val = parseInt(String(raHeader));
-              if (!isNaN(val)) { retryAfterSec = val; break; }
-            }
-            // También podría venir en metadata.raw mensaje
-            const metadataRaw = raw?.error?.metadata?.raw ?? raw?.metadata?.raw ?? null;
+            const raw = f.outputRaw;
+            const ra = getRetryAfterSecFromRaw(raw);
+            if (ra) { retryAfterSec = ra; break; }
+
+            const metadataRaw = getMetadataRaw(raw);
             if (typeof metadataRaw === 'string' && /rate-limited|Retry-After/i.test(metadataRaw)) {
               // no podemos parsear un número, dejamos null
             }
           }
-        } catch (e) {}
+        } catch {}
 
         const headers: Record<string,string> = {};
         if (retryAfterSec) headers['Retry-After'] = String(retryAfterSec);
