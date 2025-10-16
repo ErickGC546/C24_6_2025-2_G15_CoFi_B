@@ -199,42 +199,88 @@ export async function POST(req: Request) {
 
   const aiResults: Array<{ input: string; outputRaw: unknown; outputText: string | null; ok: boolean; status?: number }> = [];
 
-  for (const m of messages) {
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: modelName,
-          messages: [
-            {
-              role: "system",
-              content: "Eres un asistente financiero inteligente que analiza presupuestos, gastos e ingresos y ofrece consejos claros y útiles para mejorar las finanzas personales para estudiantes."
-            },
-            { role: "user", content: m }
-          ],
-        }),
-      });
+    // Helper to call provider with retries and exponential backoff
+    const callProviderWithRetries = async (prompt: string) => {
+      const MAX_RETRIES = 3;
+      let attempt = 0;
+      let lastParsed: any = null;
+      let lastStatus = 0;
 
-      let parsed: unknown = null;
-      try {
-        parsed = await res.json();
-      } catch {
-        parsed = null;
+      while (attempt < MAX_RETRIES) {
+        attempt++;
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages: [
+              {
+                role: "system",
+                content: "Eres un asistente financiero inteligente que analiza presupuestos, gastos e ingresos y ofrece consejos claros y útiles para mejorar las finanzas personales para estudiantes."
+              },
+              { role: "user", content: prompt }
+            ],
+          }),
+        });
+
+        let parsed: any = null;
+        try { parsed = await res.json(); } catch (err) { parsed = null; }
+        lastParsed = parsed;
+        lastStatus = res.status;
+
+        // Debug logging
+        try {
+          console.log('[AI] provider response status=', res.status, 'for input truncated:', prompt?.slice?.(0,100));
+          console.log('[AI] provider parsed (truncated):', JSON.stringify(parsed)?.slice(0,2000));
+        } catch (e) {}
+
+        const text = extractText(parsed) || null;
+
+        // If success (200..299) and we have text, return result
+        if (res.ok && text) {
+          return { parsed, text, status: res.status };
+        }
+
+        // Check provider-level error code inside parsed
+        const providerCode = parsed?.error?.code ?? null;
+
+        // If rate-limited (429) or server error (5xx), consider retrying
+        const shouldRetry = (res.status === 429 || providerCode === 429) || (res.status >= 500 && res.status < 600);
+
+        if (!shouldRetry) {
+          // no retry, return what we have
+          return { parsed, text, status: res.status };
+        }
+
+        // If we should retry and haven't exhausted attempts, wait with exponential backoff
+        if (attempt < MAX_RETRIES) {
+          // Prefer Retry-After header if present
+          let waitMs = 500 * Math.pow(2, attempt - 1); // 500ms, 1000ms, 2000ms
+          try {
+            const ra = res.headers?.get ? res.headers.get('Retry-After') : null;
+            if (ra) {
+              const raSec = parseInt(ra);
+              if (!isNaN(raSec)) waitMs = Math.max(waitMs, raSec * 1000);
+            }
+          } catch (e) {}
+          await new Promise((r) => setTimeout(r, waitMs));
+          continue; // retry
+        }
+
+        // exhausted retries
+        return { parsed: lastParsed, text: null, status: lastStatus };
       }
 
-      // Debug: log provider response summary (truncated)
-      try {
-        console.log('[AI] provider response status=', res.status, 'for input truncated:', m?.slice?.(0,100));
-        console.log('[AI] provider parsed (truncated):', JSON.stringify(parsed)?.slice(0,2000));
-      } catch {
-        /* ignore logging errors */
-      }
+      // fallback
+      return { parsed: lastParsed, text: null, status: lastStatus };
+    };
 
-      const text = extractText(parsed) || null;
-      aiResults.push({ input: m, outputRaw: parsed, outputText: text, ok: !!text, status: res.status });
+    for (const m of messages) {
+      const r = await callProviderWithRetries(m);
+      aiResults.push({ input: m, outputRaw: r.parsed, outputText: r.text, ok: !!r.text, status: r.status });
     }
 
     // Si alguna de las consultas no devolvió texto útil, no cobramos y devolvemos error al cliente
@@ -245,6 +291,33 @@ export async function POST(req: Request) {
       try {
         console.log('[AI] aiResults (truncated):', JSON.stringify(aiResults)?.slice(0,2000));
       } catch {}
+
+      // Si el proveedor retornó 429 persistentemente, devolver 429 al cliente con mensaje amigable.
+      const any429 = failed.some(f => f.status === 429);
+      if (any429) {
+        // Intentar extraer Retry-After desde outputRaw
+        let retryAfterSec: number | null = null;
+        try {
+          for (const f of failed) {
+            const raw = f.outputRaw as any;
+            const raHeader = raw?.headers?.['retry-after'] ?? raw?.headers?.['Retry-After'] ?? null;
+            if (raHeader) {
+              const val = parseInt(String(raHeader));
+              if (!isNaN(val)) { retryAfterSec = val; break; }
+            }
+            // También podría venir en metadata.raw mensaje
+            const metadataRaw = raw?.error?.metadata?.raw ?? raw?.metadata?.raw ?? null;
+            if (typeof metadataRaw === 'string' && /rate-limited|Retry-After/i.test(metadataRaw)) {
+              // no podemos parsear un número, dejamos null
+            }
+          }
+        } catch (e) {}
+
+        const headers: Record<string,string> = {};
+        if (retryAfterSec) headers['Retry-After'] = String(retryAfterSec);
+        return NextResponse.json({ error: "Servicio de IA temporalmente sobrecargado. Por favor inténtalo en unos segundos." }, { status: 429, headers });
+      }
+
       return NextResponse.json({ error: "El proveedor de IA no devolvió respuesta válida para una o más consultas" }, { status: 502 });
     }
 
