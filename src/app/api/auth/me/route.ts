@@ -53,6 +53,24 @@ export async function GET(req: Request) {
           aiMonthlyAllowance: 500,
         },
       });
+      // Auto-aceptar invitaciones pendientes enviadas a este email
+      try {
+        if (user.email) {
+          const pending = await prisma.groupInvite.findMany({
+            where: { inviteeEmail: user.email, status: "pending" },
+          });
+          for (const inv of pending) {
+            const exists = await prisma.groupMember.findFirst({ where: { groupId: inv.groupId, userId: user.id } });
+            if (!exists) {
+              await prisma.groupMember.create({ data: { groupId: inv.groupId, userId: user.id, role: "member" } });
+            }
+            await prisma.groupInvite.update({ where: { id: inv.id }, data: { status: "accepted", inviteeUserId: user.id } });
+            await prisma.auditLog.create({ data: { actorId: user.id, action: "Auto-aceptó invitación al registrarse", detail: { groupId: inv.groupId, inviteId: inv.id } } });
+          }
+        }
+      } catch (e) {
+        console.error("Error auto-aceptando invitaciones:", e);
+      }
     }
 
     // ✅ Evitar error con BigInt al serializar

@@ -21,8 +21,15 @@ export async function PUT(
       where: { id: (await context.params).id },
     });
 
-    if (!existing || existing.userId !== decoded.uid)
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    // permisos: si pertenece a un grupo, cualquiera miembro puede actualizar; sino solo el owner de la meta
+    if (!existing) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+    if (existing.groupId) {
+      const member = await prisma.groupMember.findFirst({ where: { groupId: existing.groupId, userId: decoded.uid } });
+      if (!member) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    } else {
+      if (existing.userId !== decoded.uid)
+        return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
 
     const updated = await prisma.savingsGoal.update({
       where: { id: (await context.params).id },
@@ -53,15 +60,20 @@ export async function DELETE(
       where: { id: (await context.params).id },
     });
 
-    if (!existing || existing.userId !== decoded.uid)
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    if (!existing) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+    if (existing.groupId) {
+      const member = await prisma.groupMember.findFirst({ where: { groupId: existing.groupId, userId: decoded.uid } });
+      if (!member) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    } else {
+      if (existing.userId !== decoded.uid) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
 
     await prisma.savingsGoal.delete({ where: { id: (await context.params).id } });
     await prisma.auditLog.create({
       data: {
         actorId: decoded.uid,
-        action: "Eliminó una meta de ahorro",
-        detail: { id: (await context.params).id },
+        action: existing.groupId ? "Eliminó una meta de ahorro de grupo" : "Eliminó una meta de ahorro",
+        detail: { id: (await context.params).id, groupId: existing.groupId },
       },
     });
 
@@ -90,8 +102,13 @@ export async function GET(
       where: { id: (await context.params).id },
     });
 
-    if (!goal || goal.userId !== decoded.uid)
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    if (!goal) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+    if (goal.groupId) {
+      const member = await prisma.groupMember.findFirst({ where: { groupId: goal.groupId, userId: decoded.uid } });
+      if (!member) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    } else {
+      if (goal.userId !== decoded.uid) return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+    }
 
     return NextResponse.json(goal);
   } catch (error) {

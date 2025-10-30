@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     const decoded = await getAuth().verifyIdToken(token);
     const userId = decoded.uid;
 
-    const { title, targetAmount, targetDate } = await req.json();
+  const { title, targetAmount, targetDate, groupId } = await req.json();
 
     if (!title || !targetAmount) {
       return NextResponse.json(
@@ -24,19 +24,28 @@ export async function POST(req: Request) {
       );
     }
 
+    // si se indica groupId, validar que el usuario sea miembro activo del grupo
+    if (groupId) {
+      const member = await prisma.groupMember.findFirst({ where: { groupId, userId } });
+      if (!member) {
+        return NextResponse.json({ error: "No autorizado en este grupo" }, { status: 403 });
+      }
+    }
+
     const goal = await prisma.savingsGoal.create({
       data: {
         userId,
         title,
         targetAmount,
         targetDate: targetDate ? new Date(targetDate) : null,
+        groupId: groupId ?? null,
       },
     });
     await prisma.auditLog.create({
       data: {
         actorId: userId,
-        action: "Actualizó meta de ahorro",
-        detail: { title, targetAmount, targetDate},
+        action: groupId ? "Creó meta de ahorro de grupo" : "Creó meta de ahorro",
+        detail: { title, targetAmount, targetDate, groupId },
       },
     });
 
@@ -58,6 +67,21 @@ export async function GET(req: Request) {
 
     const token = authHeader.split(" ")[1];
     const decoded = await getAuth().verifyIdToken(token);
+
+    const { searchParams } = new URL(req.url);
+    const groupId = searchParams.get("groupId");
+
+    if (groupId) {
+      // validar que el usuario sea miembro del grupo
+      const member = await prisma.groupMember.findFirst({ where: { groupId, userId: decoded.uid } });
+      if (!member) return NextResponse.json({ error: "No autorizado en este grupo" }, { status: 403 });
+
+      const goals = await prisma.savingsGoal.findMany({
+        where: { groupId },
+        orderBy: { createdAt: "desc" },
+      });
+      return NextResponse.json(goals);
+    }
 
     const goals = await prisma.savingsGoal.findMany({
       where: { userId: decoded.uid },

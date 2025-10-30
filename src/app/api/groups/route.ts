@@ -2,6 +2,17 @@ import { NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { prisma } from "@/lib/prisma";
 import "@/lib/firebaseAdmin";
+import { safeSerialize } from "@/lib/serializers";
+import crypto from "crypto";
+
+async function generateUniqueJoinCode() {
+  for (let i = 0; i < 6; i++) {
+    const code = crypto.randomBytes(4).toString("hex").toUpperCase(); // 8 chars
+    const existing = await prisma.group.findUnique({ where: { joinCode: code } });
+    if (!existing) return code;
+  }
+  return crypto.randomBytes(6).toString("hex").toUpperCase();
+}
 
 /* 🟢 Crear grupo */
 export async function POST(req: Request) {
@@ -19,7 +30,7 @@ export async function POST(req: Request) {
     if (!name)
       return NextResponse.json({ error: "El nombre es obligatorio" }, { status: 400 });
 
-    const joinCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const joinCode = await generateUniqueJoinCode();
 
     const group = await prisma.group.create({
       data: {
@@ -43,7 +54,7 @@ export async function POST(req: Request) {
     });
 
 
-    return NextResponse.json(group);
+  return NextResponse.json(safeSerialize(group));
   } catch (error) {
     console.error("Error en POST /groups:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
@@ -70,7 +81,7 @@ export async function GET(req: Request) {
       include: { groupMembers: true },
     });
 
-    return NextResponse.json(groups);
+  return NextResponse.json(safeSerialize(groups));
   } catch (error) {
     console.error("Error en GET /groups:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });

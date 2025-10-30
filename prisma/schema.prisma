@@ -111,6 +111,7 @@ model Group {
   groupInvites     GroupInvite[]
   transactions     Transaction[]
   aiRecommendations AiRecommendation[]
+  savingsGoals     SavingsGoal[]
 
   @@index([ownerId])
 }
@@ -220,10 +221,14 @@ model SavingsGoal {
   targetAmount  Decimal
   currentAmount Decimal   @default(0)
   targetDate    DateTime?
+  groupId       String?   @map("group_id")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group         Group?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  @@index([groupId])
 }
 
 /* Uso de la IA */

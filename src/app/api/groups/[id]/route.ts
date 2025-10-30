@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import "@/lib/firebaseAdmin";
+import { safeSerialize } from "@/lib/serializers";
 
 export async function GET(
   req: Request,
@@ -11,8 +12,8 @@ export async function GET(
       where: { id: (await context.params).id },
       include: { groupMembers: { include: { user: true } } },
     });
-    if (!group) return NextResponse.json({ error: "Grupo no encontrado" }, { status: 404 });
-    return NextResponse.json(group);
+  if (!group) return NextResponse.json({ error: "Grupo no encontrado" }, { status: 404 });
+  return NextResponse.json(safeSerialize(group));
   } catch (error) {
     console.error("Error en GET /groups/[id]:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
@@ -29,7 +30,7 @@ export async function PUT(
       where: { id: (await context.params).id },
       data: { name, description, privacy },
     });
-    return NextResponse.json(updated);
+  return NextResponse.json(safeSerialize(updated));
   } catch (error) {
     console.error("Error en PUT /groups/[id]:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });

@@ -38,8 +38,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Ya eres miembro de este grupo" });
     }
 
+    // No permitir unirse a un grupo archivado
+    if (group.isArchived) {
+      return NextResponse.json({ error: "No se puede unir a un grupo archivado" }, { status: 400 });
+    }
+
     // Agregar como miembro
-    await prisma.groupMember.create({
+    const member = await prisma.groupMember.create({
       data: {
         groupId: group.id,
         userId,
@@ -47,8 +52,27 @@ export async function POST(req: Request) {
       },
     });
 
+    // Si existe una invitación pendiente para este email, marcarla como accepted
+    try {
+      const userEmail = (decoded as any).email;
+      if (userEmail) {
+        await prisma.groupInvite.updateMany({
+          where: { groupId: group.id, inviteeEmail: userEmail, status: "pending" },
+          data: { status: "accepted", inviteeUserId: userId },
+        });
+      }
+    } catch (e) {
+      // No crítico: seguir adelante
+      console.error("Warning: no se pudo actualizar invites al unirse por código:", e);
+    }
+
+    await prisma.auditLog.create({
+      data: { actorId: userId, action: "Se unió al grupo por código", detail: { groupId: group.id } },
+    });
+
     return NextResponse.json({
       message: "Te has unido al grupo correctamente",
+      member,
       group,
     });
   } catch (error) {
