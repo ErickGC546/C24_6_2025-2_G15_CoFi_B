@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuth } from "firebase-admin/auth";
+import { getAuth, type DecodedIdToken } from "firebase-admin/auth";
 import { prisma } from "@/lib/prisma";
 import "@/lib/firebaseAdmin";
 
@@ -12,8 +12,8 @@ export async function POST(req: Request) {
     }
 
     const token = authHeader.split(" ")[1];
-    const decoded = await getAuth().verifyIdToken(token);
-    const userId = decoded.uid;
+  const decoded = (await getAuth().verifyIdToken(token)) as DecodedIdToken;
+  const userId = decoded.uid;
 
     const { joinCode } = await req.json();
     if (!joinCode) {
@@ -54,8 +54,8 @@ export async function POST(req: Request) {
 
     // Si existe una invitación pendiente para este email, marcarla como accepted
     try {
-      const userEmail = (decoded as any).email;
-      if (userEmail) {
+  const userEmail = decoded.email;
+  if (userEmail) {
         await prisma.groupInvite.updateMany({
           where: { groupId: group.id, inviteeEmail: userEmail, status: "pending" },
           data: { status: "accepted", inviteeUserId: userId },
