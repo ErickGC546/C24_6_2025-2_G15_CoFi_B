@@ -70,35 +70,6 @@ Objetivo: mejorar el control económico, fomentar planificación financiera y h�
    yarn dev
 7. Abre el frontend (Flutter/Dart) y configúralo para apuntar al URL de la API (p. ej. http://localhost:3000).
 
-## Variables de entorno (ejemplos)
-Crea un archivo .env en la raíz con las variables necesarias. Ejemplos:
-
-- PORT=3000
-- NODE_ENV=development
-- DATABASE_URL=postgresql://user:password@localhost:5432/cofi_db
-- JWT_SECRET=TuSecretoJWTAqui
-- JWT_EXPIRES_IN=7d
-- MAILER_DSN=smtp://user:pass@smtp.example.com:587
-- AI_SERVICE_KEY=tu_api_key_para_servicio_IA
-
-Ajusta los nombres exactamente a lo que usa el código (configuración o archivos .env.example si existen en el repo).
-
-## Endpoints principales (ejemplos)
-A continuación algunos endpoints típicos que el frontend consumirá. Reemplázalos por los reales según el código:
-
-- POST /auth/register — Registrar usuario
-- POST /auth/login — Iniciar sesión, devuelve JWT
-- GET /users/me — Perfil del usuario (autenticado)
-- POST /groups — Crear grupo colaborativo
-- GET /groups/:id — Obtener detalles del grupo
-- POST /transactions — Crear ingreso/egreso
-- GET /transactions?userId=... — Listar transacciones
-- POST /budgets — Crear presupuesto compartido
-- GET /reports/summary — Reporte resumen (consumo por categoría, periodo)
-- POST /ai/recommendations — Obtener recomendaciones personalizadas
-
-Incluye documentación completa (Swagger/OpenAPI o README detallado de cada endpoint) dentro del repo si aún no existe. Puedo ayudarte a generar la documentación OpenAPI si quieres.
-
 ## Pruebas
 - Ejecutar tests unitarios:
   npm run test
@@ -108,23 +79,6 @@ Incluye documentación completa (Swagger/OpenAPI o README detallado de cada endp
   npm run test:e2e
   o
   yarn test:e2e
-
-Asegúrate de tener una base de datos de pruebas configurada mediante variables de entorno o docker-compose.
-
-## Buenas prácticas y seguridad
-- No subir .env ni secretos al repositorio.
-- Usar variables de entorno para credenciales y claves.
-- Validar y sanitizar toda entrada del usuario.
-- Usar HTTPS en producción y proteger el JWT (httpOnly cookies o almacenamiento seguro en el cliente).
-- Limitar tasas de petición (rate limiting) y usar CORS configurado.
-- Revisar dependencias para vulnerabilidades (npm audit / Dependabot).
-
-## Despliegue (sugerencias)
-- Contenerizar con Docker y orquestar con docker-compose o Kubernetes.
-- Usar servicios gestionados para la BD (RDS / Cloud SQL) y almacenamiento (S3).
-- Integrar CI/CD con GitHub Actions para tests y despliegues automáticos.
-- Variables sensibles a través de secretos en la plataforma de despliegue.
-
 ## Contribuir
 1. Fork y crea una branch con el nombre feature/descripcion-corta.
 2. Abre un Pull Request describiendo los cambios.
