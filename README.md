@@ -45,8 +45,6 @@ Objetivo: mejorar el control económico, fomentar planificación financiera y h�
 - CI/CD: GitHub Actions (recomendado)
 - Frontend: Flutter/Dart (repositorio separado; consume esta API)
 
-> Nota: Ajusta los detalles concretos (ORM, base de datos, librerías) según lo que esté implementado en el código. Si quieres, puedo inspeccionar los archivos para completar esta sección con los nombres exactos.
-
 ## Requisitos
 - Node.js >= 16 (o la versión indicada en el repo)
 - npm o yarn
