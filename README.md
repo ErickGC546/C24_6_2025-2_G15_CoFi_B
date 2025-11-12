@@ -1,6 +1,6 @@
 # CoFi — Administración Financiera Colaborativa (Backend)
 
-Breve: CoFi es la solución backend para una aplicación móvil y web dirigida a estudiantes del Instituto de Educación Superior Tecnológico TECSUP. La solución facilita la administración financiera colaborativa (ingresos, egresos, presupuestos compartidos), incorpora alertas, comandos de voz, reportes en tiempo real y recomendaciones personalizadas por IA. El frontend está desarrollado en Dart (aplicación móvil/web) y este repositorio contiene la API y servicios backend implementados en TypeScript.
+Breve: CoFi es la solución backend para una aplicación móvil y web dirigida a estudiantes del Instituto de Educación Superior Tecnológico TECSUP. La solución facilita la administración financiera colaborativa (ingresos, egresos, presupuestos compartidos), incorpora alertas, comandos de voz, reportes en tiempo real y recomendaciones personalizadas por IA. El frontend está desarrollado en Dart (aplicación móvil) y este repositorio contiene la API y servicios backend implementados en TypeScript.
 
 ## Tabla de contenidos
 - Descripción
@@ -73,20 +73,9 @@ Objetivo: mejorar el control económico, fomentar planificación financiera y h�
   npm run test
   o
   yarn test
-- Ejecutar tests e2e (si existen):
-  npm run test:e2e
-  o
-  yarn test:e2e
-## Contribuir
-1. Fork y crea una branch con el nombre feature/descripcion-corta.
-2. Abre un Pull Request describiendo los cambios.
-3. Ejecuta pruebas y asegúrate de que la aplicación se ejecuta localmente.
-4. Sigue las convenciones del proyecto (lint, formateo, tests).
+  
+## Equipo 
+- Backend (TypeScript): ErickGC546 (https://github.com/ErickGC546/C24_6_2025-2_G15_CoFi_B)
+- Frontend (Dart/Flutter): DanielRCor y ErickGC546 (https://github.com/DanielRCor/C24_6_2025-2_G15_CoFi_F)
 
-Si quieres, puedo crear plantillas de Issue/PR, o ayudar a configurar GitHub Actions y linters (ESLint/Prettier).
-
-## Equipo y contacto
-- Autor / Mantenimiento: ErickGC546 (propietario del repo)
-- Frontend (Dart/Flutter): equipo de frontend (repositorio separado)
-
-Para dudas o colaboración, abre un issue en este repositorio o contáctame en GitHub: https://github.com/ErickGC546
+Autor del repo: ErickGC546
