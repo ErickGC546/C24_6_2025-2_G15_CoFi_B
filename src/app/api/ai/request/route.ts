@@ -137,6 +137,12 @@ export async function POST(req: Request) {
     // Llamar al proveedor por cada mensaje y recolectar respuestas. No grabamos nada hasta que todas las respuestas sean válidas.
     const modelName = "google/gemini-2.0-flash-exp:free";
 
+    // Verificar que la API key esté configurada
+    if (!process.env.OPENROUTER_API_KEY) {
+      console.error('[AI] missing OPENROUTER_API_KEY');
+      return NextResponse.json({ error: 'Falta la configuración del proveedor de IA (OPENROUTER_API_KEY).' }, { status: 500 });
+    }
+
   const extractText = (data: unknown): string | null => {
       // Intentar varias rutas comunes para extraer texto
       try {
@@ -372,10 +378,65 @@ export async function POST(req: Request) {
 
         const headers: Record<string,string> = {};
         if (retryAfterSec) headers['Retry-After'] = String(retryAfterSec);
-        return NextResponse.json({ error: "Servicio de IA temporalmente sobrecargado. Por favor inténtalo en unos segundos." }, { status: 429, headers });
+
+        // Try to return a cached previous successful response for the same input(s)
+        try {
+          for (const f of failed) {
+            try {
+              const cached = await prisma.aiUsage.findFirst({
+                where: {
+                  userId,
+                  inputJson: { path: ["userMessage"], equals: f.input },
+                },
+                orderBy: { createdAt: "desc" },
+              });
+              if (cached && cached.outputJson && (cached.outputJson as any).message) {
+                const cachedMessage = (cached.outputJson as any).message as string;
+                console.log('[AI] returning cached response for user', userId, 'input', f.input?.slice?.(0,80));
+                return NextResponse.json({ response: cachedMessage, _notice: 'cached' }, { status: 200 });
+              }
+            } catch (e) {
+              /* ignore cache lookup errors */
+            }
+          }
+        } catch (e) {
+          /* ignore */
+        }
+
+        // Incluir detalle del proveedor (no incluir claves) para facilitar debugging en frontend
+        const providerDetails = failed.map(f => ({ status: f.status, input: f.input }));
+        // Devuelve un fallback 200 para que el frontend muestre un mensaje en la conversación
+        return NextResponse.json({ response: "No he podido obtener respuesta del servicio de IA en este momento. Intenta de nuevo en unos segundos.", provider: providerDetails, _notice: "rate_limited" }, { status: 200, headers });
       }
 
-      return NextResponse.json({ error: "El proveedor de IA no devolvió respuesta válida para una o más consultas" }, { status: 502 });
+      // Si no fue un 429, devolver 502 con detalle del proveedor
+      // Try cached
+      try {
+        for (const f of failed) {
+          try {
+            const cached = await prisma.aiUsage.findFirst({
+              where: {
+                userId,
+                inputJson: { path: ["userMessage"], equals: f.input },
+              },
+              orderBy: { createdAt: "desc" },
+            });
+            if (cached && cached.outputJson && (cached.outputJson as any).message) {
+              const cachedMessage = (cached.outputJson as any).message as string;
+              console.log('[AI] returning cached response for user', userId, 'input', f.input?.slice?.(0,80));
+              return NextResponse.json({ response: cachedMessage, _notice: 'cached' }, { status: 200 });
+            }
+          } catch (e) {
+            /* ignore cache lookup errors */
+          }
+        }
+      } catch (e) {
+        /* ignore */
+      }
+
+      const providerDetails = failed.map(f => ({ status: f.status, input: f.input }));
+      // Devuelve fallback 200 para no romper la UI; incluye detalles para el dev.
+      return NextResponse.json({ response: "El servicio de IA no devolvió respuesta válida. Intenta nuevamente en unos segundos.", provider: providerDetails, _notice: "provider_error" }, { status: 200 });
     }
 
     // Guardar todas las entradas en una transacción atómica: múltiples AiUsage, una AiCreditsTransaction y actualizar saldo del usuario.
