@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { prisma } from "@/lib/prisma";
 import "@/lib/firebaseAdmin";
-import type { Prisma } from "@/generated/prisma";
 // Infer the transaction client type from the prisma.$transaction signature
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
@@ -391,7 +390,7 @@ export async function POST(req: Request) {
         // Crear usos individuales
         for (let i = 0; i < aiResults.length; i++) {
           const r = aiResults[i];
-          await tx.aiUsage.create({
+            await tx.aiUsage.create({
             data: {
               userId,
               provider: "openrouter",
@@ -401,8 +400,9 @@ export async function POST(req: Request) {
               tokensOut: 0,
               tokensTotal: 0,
               creditsCharged: 1,
-              inputJson: { userMessage: r.input, ...(idempoKey ? { idempotencyKey: idempoKey } : {}) },
-              outputJson: { message: r.outputText, raw: r.outputRaw as Prisma.InputJsonValue },
+                inputJson: { userMessage: r.input, ...(idempoKey ? { idempotencyKey: idempoKey } : {}) },
+                // Serialize outputRaw to a JSON-safe value to avoid importing generated Prisma types
+                outputJson: { message: r.outputText, raw: JSON.parse(JSON.stringify(r.outputRaw)) },
             },
           });
         }
