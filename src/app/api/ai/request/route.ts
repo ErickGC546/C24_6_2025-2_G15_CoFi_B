@@ -204,6 +204,37 @@ export async function POST(req: Request) {
       }
     };
 
+    // Helper: extract a cached message string from stored outputJson safely (avoid `any` casts)
+    const extractCachedMessage = (out: unknown): string | null => {
+      try {
+        if (!out || typeof out !== 'object') return null;
+        const o = out as Record<string, unknown>;
+        if (typeof o.message === 'string') return o.message;
+        if (typeof o.outputText === 'string') return o.outputText;
+        const raw = o.raw;
+        if (raw && typeof raw === 'object') {
+          const r = raw as Record<string, unknown>;
+          if (typeof r.message === 'string') return r.message;
+          if (typeof r.text === 'string') return r.text;
+          // Try nested choices -> message.content
+          if (Array.isArray(r.choices) && r.choices.length > 0) {
+            const c0 = r.choices[0];
+            if (c0 && typeof c0 === 'object') {
+              const cObj = c0 as Record<string, unknown>;
+              const msg = cObj.message;
+              if (msg && typeof msg === 'object') {
+                const m = msg as Record<string, unknown>;
+                if (typeof m.content === 'string') return m.content;
+              }
+            }
+          }
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    };
+
   const aiResults: Array<{ input: string; outputRaw: unknown; outputText: string | null; ok: boolean; status?: number }> = [];
 
     // Helper to call provider with retries and exponential backoff
@@ -390,16 +421,18 @@ export async function POST(req: Request) {
                 },
                 orderBy: { createdAt: "desc" },
               });
-              if (cached && cached.outputJson && (cached.outputJson as any).message) {
-                const cachedMessage = (cached.outputJson as any).message as string;
+              if (cached && cached.outputJson) {
+                const cachedMessage = extractCachedMessage(cached.outputJson);
+                if (cachedMessage) {
                 console.log('[AI] returning cached response for user', userId, 'input', f.input?.slice?.(0,80));
                 return NextResponse.json({ response: cachedMessage, _notice: 'cached' }, { status: 200 });
+                }
               }
-            } catch (e) {
+            } catch {
               /* ignore cache lookup errors */
             }
           }
-        } catch (e) {
+        } catch {
           /* ignore */
         }
 
@@ -421,16 +454,18 @@ export async function POST(req: Request) {
               },
               orderBy: { createdAt: "desc" },
             });
-            if (cached && cached.outputJson && (cached.outputJson as any).message) {
-              const cachedMessage = (cached.outputJson as any).message as string;
+            if (cached && cached.outputJson) {
+              const cachedMessage = extractCachedMessage(cached.outputJson);
+              if (cachedMessage) {
               console.log('[AI] returning cached response for user', userId, 'input', f.input?.slice?.(0,80));
               return NextResponse.json({ response: cachedMessage, _notice: 'cached' }, { status: 200 });
+              }
             }
-          } catch (e) {
+          } catch {
             /* ignore cache lookup errors */
           }
         }
-      } catch (e) {
+      } catch {
         /* ignore */
       }
 
