@@ -107,12 +107,59 @@ interface RecentUser {
   role: string;
   avatarUrl?: string | null;
   createdAt: string;
+  totalBalance?: number;
+  currency?: string;
+  transactionsNet?: number;
+  budgetAmount?: number;
+}
+
+interface AdminTransaction {
+  date: string;
+  userName?: string | null;
+  userEmail?: string | null;
+  description?: string | null;
+  category?: string | null;
+  amount?: number;
+  currency?: string | null;
+}
+
+interface AdminStats {
+  totalUsers?: number;
+  activeGroups?: number;
+  totalExpensesMonth?: number;
+  totalTransactionsMonth?: number;
+  avgExpensePerUser?: number;
+  recentTransactions?: AdminTransaction[];
+  // optional summary payload used elsewhere
+  summary?: Summary | null;
+}
+
+interface Profile {
+  id?: string;
+  email?: string | null;
+  name?: string | null;
+  role?: string;
+  aiCreditsRemaining?: number;
+}
+
+interface Summary {
+  budget?: number;
+  budgetUsed?: number;
+  remainingBudget?: number;
+  totalExpense?: number;
+  currency?: string | null;
 }
 
 export default function HomePage() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [recentUsers, setRecentUsers] = useState<RecentUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [adminStats, setAdminStats] = useState<AdminStats | null>(null);
+  const [loadingAdminStats, setLoadingAdminStats] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -122,11 +169,53 @@ export default function HomePage() {
     return () => unsubscribe();
   }, []);
 
+  // Cuando hay user, obtener perfil desde la API /api/auth/me para conocer el role
+  useEffect(() => {
+    async function loadProfile() {
+      if (!user) {
+        setProfile(null);
+        return;
+      }
+
+      try {
+        setLoadingProfile(true);
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) {
+          // En dev quizá no tengamos token; llamar sin header igual fallará en prod
+          console.warn('No se obtuvo token de auth.currentUser');
+        }
+
+        const res = await fetch('/api/auth/me', {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+
+        if (!res.ok) {
+          console.error('Error obteniendo perfil:', res.status, await res.text());
+          setProfile(null);
+          return;
+        }
+
+        const data = await res.json();
+        setProfile(data);
+      } catch (err) {
+        console.error('Error cargando perfil:', err);
+        setProfile(null);
+      } finally {
+        setLoadingProfile(false);
+      }
+    }
+
+    loadProfile();
+  }, [user]);
+
   // Datos mock simples para el panel de administración (KPIs)
   const mockKpis = {
     totalUsers: 2,
     totalExpensesMonth: 0,
     activeGroups: 0,
+    totalTransactionsMonth: 0,
+    avgExpensePerUser: 0,
+    totalRevenueMonth: 0,
   };
 
   // Fetch usuarios recientes cuando haya user y sea admin (cliente)
@@ -164,21 +253,59 @@ export default function HomePage() {
     loadRecentUsers();
   }, [user]);
 
+  
+  // Cargar estadísticas del admin (si el perfil es admin)
+  useEffect(() => {
+    async function loadAdminStats() {
+      if (!user || !profile || profile.role !== 'admin') {
+        setAdminStats(null);
+        return;
+      }
+      try {
+        setLoadingAdminStats(true);
+        setLoadingSummary(true);
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch('/api/admin/stats', {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+        if (!res.ok) {
+          console.error('Error al obtener admin stats', res.status, await res.text());
+          setAdminStats(null);
+          return;
+        }
+        const data = await res.json();
+        setAdminStats(data);
+        // si la respuesta incluye resumen, guardarlo también
+        if (data && data.summary) setSummary(data.summary);
+      } catch (err) {
+        console.error('Error cargando admin stats:', err);
+        setAdminStats(null);
+      } finally {
+        setLoadingAdminStats(false);
+        setLoadingSummary(false);
+      }
+    }
+
+    loadAdminStats();
+  }, [user, profile]);
+
   return (
     <>
       {!user ? (
         <AutoCarousel />
-      ) : (
+      ) : loadingProfile ? (
+        <div className="p-10">Cargando perfil...</div>
+      ) : profile && profile.role === 'admin' ? (
         <div className="p-10">
-          <div className="flex flex-col items-start mb-8">
-            <h1 className="text-3xl font-bold mb-1">
-              ¡Hola admin, {user.displayName || 'Usuario'}!
-            </h1>
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-3xl font-bold mb-1">¡Hola {profile.name || user.displayName || 'Admin'}!</h1>
+              <p className="text-sm text-gray-500">Has iniciado sesión como administrador.</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl font-semibold mt-8">Reportes y panel de admin</h2>
-            <p className="text-gray-600 mt-2">Aquí puedes ver y gestionar los reportes de usuarios y actividades.</p>
-            {/* Panel básico de administración: KPIs y transacciones recientes (mock) */}
+            <div>
+            <h2 className="text-xl font-semibold mt-2">Panel de administración</h2>
+            <p className="text-gray-600 mt-2">{loadingAdminStats ? 'Cargando estadísticas...' : 'Accesos rápidos y métricas principales.'}</p>
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-white rounded-lg shadow-md p-4 flex items-center space-x-4">
                 <div className="w-12 h-12 rounded-full bg-green-50 flex items-center justify-center">
@@ -186,17 +313,8 @@ export default function HomePage() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Usuarios</p>
-                  <p className="text-2xl font-semibold text-gray-900">{mockKpis.totalUsers}</p>
+                  <p className="text-2xl font-semibold text-gray-900">{adminStats ? adminStats.totalUsers : mockKpis.totalUsers}</p>
                   <p className="text-xs text-gray-400">Totales registrados</p>
-                </div>
-              </div>
-              <div className="bg-white rounded-lg shadow-md p-4 flex items-center space-x-4">
-                <div className="w-12 h-12 rounded-full bg-yellow-50 flex items-center justify-center">
-                  <span className="text-2xl">💸</span>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Gastos este mes</p>
-                  <p className="text-2xl font-semibold text-gray-900">S/ {mockKpis.totalExpensesMonth.toFixed(2)}</p>
                 </div>
               </div>
               <div className="bg-white rounded-lg shadow-md p-4 flex items-center space-x-4">
@@ -204,10 +322,75 @@ export default function HomePage() {
                   <span className="text-2xl">👥</span>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Grupos activos</p>
-                  <p className="text-2xl font-semibold text-gray-900">{mockKpis.activeGroups}</p>
-                  <p className="text-xs text-gray-400">Grupos con actividad reciente</p>
+                  <p className="text-sm text-gray-500">Grupos creados</p>
+                  <p className="text-2xl font-semibold text-gray-900">{adminStats ? adminStats.activeGroups : mockKpis.activeGroups}</p>
+                  <p className="text-xs text-gray-400">Total de grupos en la plataforma</p>
                 </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white rounded-lg shadow-md p-4 flex items-center space-x-4">
+                <div className="w-12 h-12 rounded-full bg-yellow-50 flex items-center justify-center">
+                  <span className="text-2xl">💸</span>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Gastos (mes)</p>
+                  <p className="text-2xl font-semibold text-gray-900">{adminStats ? `S/ ${Number(adminStats.totalExpensesMonth ?? 0).toFixed(2)}` : `S/ ${Number(mockKpis.totalExpensesMonth).toFixed(2)}`}</p>
+                  <p className="text-xs text-gray-400">Total gastado este mes</p>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow-md p-4 flex items-center space-x-4">
+                <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center">
+                  <span className="text-2xl">🔁</span>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Transacciones (mes)</p>
+                  <p className="text-2xl font-semibold text-gray-900">{adminStats ? adminStats.totalTransactionsMonth ?? mockKpis.totalTransactionsMonth : mockKpis.totalTransactionsMonth}</p>
+                  <p className="text-xs text-gray-400">Número de transacciones</p>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow-md p-4 flex items-center space-x-4">
+                <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center">
+                  <span className="text-2xl">📈</span>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Promedio por usuario</p>
+                  <p className="text-2xl font-semibold text-gray-900">{adminStats ? `S/ ${Number(adminStats.avgExpensePerUser ?? mockKpis.avgExpensePerUser).toFixed(2)}` : `S/ ${Number(mockKpis.avgExpensePerUser).toFixed(2)}`}</p>
+                  <p className="text-xs text-gray-400">Promedio de gasto por usuario</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-8">
+              <h3 className="text-lg font-medium mb-2">Últimas transacciones</h3>
+              <div className="overflow-x-auto bg-white rounded-lg shadow">
+                <table className="min-w-full text-left">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600">Fecha</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600">Usuario</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600">Descripción</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adminStats && adminStats.recentTransactions && adminStats.recentTransactions.length ? (
+                      adminStats.recentTransactions.map((t: AdminTransaction, i: number) => (
+                        <tr key={i} className="border-t hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3 text-sm text-gray-700">{new Date(t.date).toLocaleString()}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">{t.userName || t.userEmail || '—'}</td>
+                          <td className="px-4 py-3 text-sm text-gray-700">{t.description || t.category || '—'}</td>
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{t.currency === 'PEN' || !t.currency ? `S/ ${Number(t.amount ?? 0).toFixed(2)}` : `${Number(t.amount ?? 0).toFixed(2)} ${t.currency}`}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr><td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500">No hay transacciones recientes para mostrar.</td></tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
             <div className="mt-8">
@@ -219,7 +402,7 @@ export default function HomePage() {
                       <th className="px-4 py-3 text-sm font-medium text-gray-600">Fecha</th>
                       <th className="px-4 py-3 text-sm font-medium text-gray-600">Usuario</th>
                       <th className="px-4 py-3 text-sm font-medium text-gray-600">Rol</th>
-                      <th className="px-4 py-3 text-sm font-medium text-gray-600">Monto</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600">Presupuesto</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -247,7 +430,13 @@ export default function HomePage() {
                               {u.role}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">S/ 0.00</td>
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                            {(() => {
+                              const val = u.budgetAmount !== undefined ? u.budgetAmount : (u.totalBalance !== undefined ? u.totalBalance : (u.transactionsNet !== undefined ? u.transactionsNet : 0));
+                              const formatted = `${u.currency === 'PEN' ? 'S/ ' : ''}${Number(val).toFixed(2)}`;
+                              return formatted;
+                            })()}
+                          </td>
                         </tr>
                       ))
                     ) : (
@@ -258,6 +447,51 @@ export default function HomePage() {
               </div>
             </div>
           </div>
+        </div>
+      ) : (
+        // Vista para usuario normal autenticado
+        <div className="p-10">
+          <div className="flex items-center space-x-4 mb-6">
+            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-xl">{(profile?.name || user.displayName || user.email || 'U').charAt(0)}</div>
+            <div>
+              <h1 className="text-2xl font-semibold">Hola, {profile?.name || user.displayName || 'Usuario'}</h1>
+              <p className="text-sm text-gray-500">Bienvenido a COFI. Aquí puedes descargar la app.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <p className="text-sm text-gray-500">Tus grupos</p>
+              <p className="text-2xl font-semibold">0</p>
+            </div>
+            <div className="bg-white rounded-lg shadow-md p-4">
+              <p className="text-sm text-gray-500">Gastos este mes</p>
+              <p className="text-2xl font-semibold">S/ 0.00</p>
+            </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white rounded-lg shadow-md p-4">
+                <p className="text-sm text-gray-500">Presupuesto Mensual</p>
+                {loadingSummary ? (
+                  <p className="text-2xl font-semibold">Cargando...</p>
+                ) : summary ? (
+                  <div>
+                    <p className="text-2xl font-semibold">{summary.currency === 'PEN' || !summary.currency ? `S/ ${Number(summary.budgetUsed ?? summary.budget ?? 0).toFixed(2)} / S/ ${Number(summary.budget ?? 0).toFixed(2)}` : `${Number(summary.budgetUsed ?? summary.budget ?? 0).toFixed(2)} ${summary.currency} / ${Number(summary.budget ?? 0).toFixed(2)} ${summary.currency}`}</p>
+                    <p className="text-sm text-gray-500">Queda {summary.currency === 'PEN' || !summary.currency ? `S/ ${Number(summary.remainingBudget ?? 0).toFixed(2)}` : `${Number(summary.remainingBudget ?? 0).toFixed(2)} ${summary.currency}`}</p>
+                  </div>
+                ) : (
+                  <p className="text-2xl font-semibold">S/ 0.00</p>
+                )}
+              </div>
+              <div className="bg-white rounded-lg shadow-md p-4">
+                <p className="text-sm text-gray-500">Gastos este mes</p>
+                <p className="text-2xl font-semibold">{summary ? `S/ ${Number(summary.totalExpense ?? 0).toFixed(2)}` : 'S/ 0.00'}</p>
+              </div>
+              <div className="bg-white rounded-lg shadow-md p-4">
+                <p className="text-sm text-gray-500">Créditos de IA</p>
+                <p className="text-2xl font-semibold">{profile?.aiCreditsRemaining ?? '-'}</p>
+              </div>
+            </div>
         </div>
       )}
     </>
