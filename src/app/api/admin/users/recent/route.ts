@@ -2,6 +2,18 @@ import { NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import "@/lib/firebaseAdmin";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
+
+type RecentUser = {
+  id: string;
+  email: string;
+  name?: string | null;
+  role: string;
+  avatarUrl?: string | null;
+  createdAt: Date;
+  accounts: { balance: Prisma.Decimal | number | null; currency: string }[];
+  budgets: { amount: Prisma.Decimal | number | null; month: Date }[];
+};
 
 export async function GET(req: Request) {
   try {
@@ -35,7 +47,7 @@ export async function GET(req: Request) {
 
     // Obtener los usuarios más recientes
     // Obtener los usuarios más recientes junto con sus cuentas para calcular el balance total
-    const users = await prisma.user.findMany({
+    const users = (await prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       take: 20,
       select: {
@@ -59,7 +71,7 @@ export async function GET(req: Request) {
           },
         },
       },
-    });
+    })) as RecentUser[];
 
     // Calcular balance total por usuario (sumando balances de sus cuentas).
     // Además, calcular la suma neta de transacciones (ingresos - gastos) como fallback.
@@ -89,14 +101,14 @@ export async function GET(req: Request) {
         const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime();
         let budgetAmount = 0;
         if (u.budgets && u.budgets.length) {
-          const found = u.budgets.find((b: any) => {
+          const found = u.budgets.find((b) => {
             const m = new Date(b.month).getTime();
             return m >= startOfMonth && m < startOfNextMonth;
           });
           if (found) budgetAmount = Number(found.amount ?? 0);
           else {
             // Si no hay presupuesto para el mes actual, mostrar el presupuesto más reciente disponible
-            const latest = u.budgets.reduce((prev: any, cur: any) => {
+            const latest = u.budgets.reduce((prev, cur) => {
               return new Date(cur.month).getTime() > new Date(prev.month).getTime() ? cur : prev;
             }, u.budgets[0]);
             if (latest) budgetAmount = Number(latest.amount ?? 0);

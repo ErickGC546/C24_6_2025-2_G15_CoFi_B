@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 import "@/lib/firebaseAdmin";
+import type { Prisma } from "@/generated/prisma";
+// Infer the transaction client type from the prisma.$transaction signature
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
 export async function POST(req: Request) {
   try {
@@ -379,7 +381,7 @@ export async function POST(req: Request) {
 
     // Guardar todas las entradas en una transacción atómica: múltiples AiUsage, una AiCreditsTransaction y actualizar saldo del usuario.
     try {
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx: Tx) => {
         const user = await tx.user.findUnique({ where: { id: userId } });
         if (!user) throw new Error("Usuario no encontrado");
         if (user.aiCreditsRemaining < creditsToCharge) {
