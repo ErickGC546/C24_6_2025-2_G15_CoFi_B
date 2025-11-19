@@ -24,7 +24,7 @@ export async function POST(req: Request) {
         recSummary,
         recFull,
         score,
-        model: "google/gemini-2.0-flash-exp:free",
+        model: "gemini-2.5-pro",
       },
     });
 
