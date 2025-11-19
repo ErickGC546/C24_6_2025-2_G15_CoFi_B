@@ -259,7 +259,7 @@ model SavingsGoal {
 model AiUsage {
   id              String        @id @default(uuid())
   userId          String?       @map("user_id")
-  provider        String?       @default("openrouter") // puede ser "openrouter" u otro
+  provider        String?       @default("gemini") // puede ser "gemini" u otro
   requestType     AiRequestType
   model           String
   tokensIn        Int
