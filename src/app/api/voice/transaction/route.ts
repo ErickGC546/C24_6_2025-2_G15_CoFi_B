@@ -98,24 +98,22 @@ El usuario dirá una frase en español y tu trabajo es extraer:
 - type: "expense" (gasto) o "income" (ingreso)
 - amount: el monto numérico (solo el número, sin símbolos)
 - description: descripción de la transacción
-- categoryName: nombre de la categoría (una sola palabra en minúsculas)
+- categoryName: nombre de la categoría (usa los nombres EXACTOS de la lista)
 
-Categorías válidas:
-- alimentacion (comida, almuerzo, desayuno, cena, restaurante)
-- transporte (taxi, uber, bus, pasaje, movilidad)
-- tecnologia (internet, celular, recarga, apps, netflix)
-- salud (doctor, farmacia, medicina, hospital)
-- ocio (cine, entretenimiento, juegos, salida)
-- educacion (cursos, libros, universidad, colegio)
-- vivienda (alquiler, luz, agua, gas)
-- ropa (ropa, zapatos, vestimenta)
-- otros (cualquier otra cosa)
+Categorías válidas para GASTOS (expense):
+- Alimentación (comida, almuerzo, desayuno, cena, restaurante, comida rápida)
+- Transporte (taxi, uber, bus, pasaje, movilidad, gasolina, combustible)
+- Servicios (internet, celular, recarga, apps, netflix, suscripciones)
+- Salud (doctor, farmacia, medicina, hospital, consulta médica)
+- Entretenimiento (cine, ocio, juegos, salida, diversión, fiesta)
+- Educación (cursos, libros, universidad, colegio, estudios)
+- Ropa (ropa, zapatos, vestimenta, ropa deportiva, accesorios)
+- Metas (ahorro, meta, inversión)
+- tecnologia (tecnología, laptop, celular, gadgets, electrónicos)
 
-Para ingresos, usa categorías como:
-- salario (sueldo, nomina, pago)
-- ventas (venta, vendí)
-- freelance (trabajo independiente)
-- otros
+Categorías válidas para INGRESOS (income):
+- Trabajo (sueldo, salario, nómina, pago de trabajo)
+- Vasos (venta de vasos, negocio de vasos)
 
 Reglas importantes:
 1. Si el usuario dice "gasté", "compré", "pagué" → type: "expense"
@@ -123,6 +121,8 @@ Reglas importantes:
 3. Si no especifica, asume "expense" por defecto
 4. El monto debe ser un número decimal (ej: 5.50, 100, 770)
 5. Si menciona "soles" o "S/" es moneda peruana (PEN)
+6. Usa EXACTAMENTE los nombres de categorías de la lista (respeta mayúsculas/minúsculas)
+7. Si no estás seguro de la categoría, NO inventes, usa el nombre más cercano de la lista
 
 Responde SOLO con un JSON válido, sin explicaciones:
 {
@@ -141,7 +141,7 @@ Responde SOLO con un JSON válido, sin explicaciones:
 
     try {
       const completion = await client.chat.completions.create({
-        model: "gemini-1.5-flash",
+        model: "gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: transcription },
@@ -185,22 +185,40 @@ Responde SOLO con un JSON válido, sin explicaciones:
     let categoryId: string | null = null;
 
     if (parsedData.categoryName) {
-      // Buscar categoría del usuario que coincida con el nombre
+      // Buscar categoría primero en las del usuario, luego en las predeterminadas del sistema
       const category = await prisma.category.findFirst({
         where: {
-          userId,
-          name: {
-            contains: parsedData.categoryName,
-            mode: "insensitive", // case-insensitive
-          },
+          OR: [
+            // Prioridad 1: Categorías del usuario
+            {
+              userId,
+              name: {
+                contains: parsedData.categoryName,
+                mode: "insensitive", // case-insensitive
+              },
+            },
+            // Prioridad 2: Categorías predeterminadas del sistema (userId = null)
+            {
+              userId: null,
+              name: {
+                contains: parsedData.categoryName,
+                mode: "insensitive",
+              },
+            },
+          ],
         },
+        orderBy: [
+          { userId: "desc" }, // Priorizar categorías del usuario (no null) primero
+          { name: "asc" },
+        ],
       });
 
       if (category) {
         categoryId = category.id;
-        console.log(`[Voice] Categoría encontrada: ${category.name} (${categoryId})`);
+        const categoryType = category.userId ? "personalizada" : "predeterminada";
+        console.log(`[Voice] Categoría ${categoryType} encontrada: ${category.name} (${categoryId})`);
       } else {
-        console.log(`[Voice] No se encontró categoría "${parsedData.categoryName}"`);
+        console.log(`[Voice] ⚠️ No se encontró categoría "${parsedData.categoryName}" (ni del usuario ni predeterminada)`);
       }
     }
 
@@ -250,7 +268,7 @@ Responde SOLO con un JSON válido, sin explicaciones:
         userId,
         provider: "gemini",
         requestType: "other",
-        model: "gemini-1.5-flash",
+        model: "gemini-2.5-flash",
         tokensIn,
         tokensOut,
         tokensTotal: tokensIn + tokensOut,
