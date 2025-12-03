@@ -548,23 +548,8 @@ export default function HomePage() {
           </div>
         </div>
       ) : (
-        // Vista para usuario normal autenticado - Mostrar carrusel automático y botón de descarga
-        <>
-          <UserCarousel userName={profile?.name || user.displayName || 'Usuario'} />
-          <div className="mt-8">
-            <a
-              href="https://drive.google.com/drive/u/2/folders/1U1kCOzs93iS89azrcBKjqPgEEK85D-g0"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-8 rounded-lg shadow-lg transition-all transform hover:scale-105"
-            >
-              📱 Descargar App Android
-            </a>
-            <p className="text-sm text-gray-500 mt-4">
-              Gestiona tus finanzas desde tu dispositivo móvil
-            </p>
-          </div>
-        </>
+        // Vista para usuario normal autenticado - Mostrar carrusel automático
+        <UserCarousel userName={profile?.name || user.displayName || 'Usuario'} />
       )}
     </>
   );
