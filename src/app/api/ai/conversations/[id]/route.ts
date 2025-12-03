@@ -4,7 +4,10 @@ import { prisma } from "@/lib/prisma";
 import "@/lib/firebaseAdmin";
 
 /* 🟢 OBTENER UNA CONVERSACIÓN CON TODOS SUS MENSAJES */
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -15,9 +18,11 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     const decoded = await getAuth().verifyIdToken(token);
     const userId = decoded.uid;
 
+    const { id } = await params;
+
     const conversation = await prisma.conversation.findFirst({
       where: {
-        id: params.id,
+        id,
         userId,
       },
       include: {
@@ -48,7 +53,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 }
 
 /* 🔴 ELIMINAR CONVERSACIÓN */
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -59,10 +67,12 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     const decoded = await getAuth().verifyIdToken(token);
     const userId = decoded.uid;
 
+    const { id } = await params;
+
     // Verificar que la conversación pertenece al usuario
     const conversation = await prisma.conversation.findFirst({
       where: {
-        id: params.id,
+        id,
         userId,
       },
     });
@@ -73,7 +83,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 
     // Eliminar conversación (los mensajes se eliminan en cascada)
     await prisma.conversation.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ success: true, message: "Conversación eliminada" });
@@ -84,7 +94,10 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 }
 
 /* 🟡 ACTUALIZAR TÍTULO DE CONVERSACIÓN */
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -102,10 +115,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       return NextResponse.json({ error: "Título inválido" }, { status: 400 });
     }
 
+    const { id } = await params;
+
     // Verificar que la conversación pertenece al usuario y actualizar
     const conversation = await prisma.conversation.updateMany({
       where: {
-        id: params.id,
+        id,
         userId,
       },
       data: { title },
