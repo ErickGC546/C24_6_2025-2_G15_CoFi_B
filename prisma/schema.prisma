@@ -94,6 +94,7 @@ model User {
   aiUsages              AiUsage[]
   aiCreditsTransactions AiCreditsTransaction[]
   aiRecommendations     AiRecommendation[]
+  conversations         Conversation[]
 
   @@index([email])
 }
@@ -291,21 +292,43 @@ model AiCreditsTransaction {
 }
 
 /**
+ * Conversaciones de IA (tipo chat)
+ */
+model Conversation {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  title     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aiRecommendations   AiRecommendation[]
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+/**
  * Recomendaciones de la IA
  */
 model AiRecommendation {
-  id          String   @id @default(uuid())
-  userId      String
-  groupId     String?
-  recType     String?
-  recSummary  String?
-  recFull     Json?
-  model       String?
-  score       Float?
-  generatedAt DateTime @default(now())
+  id             String        @id @default(uuid())
+  userId         String
+  groupId        String?
+  conversationId String?       @map("conversation_id")
+  recType        String?
+  recSummary     String?
+  recFull        Json?
+  inputJson      Json?         // Almacena la pregunta/entrada del usuario para el historial de chat
+  model          String?
+  score          Float?
+  generatedAt    DateTime      @default(now())
 
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  group Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group        Group?        @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
 }
 
 /**

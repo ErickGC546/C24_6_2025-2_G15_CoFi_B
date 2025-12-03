@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { useState, useEffect } from 'react';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 
@@ -9,7 +9,32 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [showAppDownload, setShowAppDownload] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const token = await user.getIdToken();
+          const res = await fetch('/api/auth/me', {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const data = await res.json();
+          
+          if (data.role === 'usuario') {
+            setShowAppDownload(true);
+          }
+        } catch (error) {
+          console.error('Error checking user role:', error);
+        }
+      } else {
+        setShowAppDownload(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,6 +85,11 @@ export default function LoginPage() {
       setError('Error al iniciar sesión con Google');
     }
   };
+
+  const handleDownloadApp = () => {
+    // Reemplaza con la URL real de tu app
+    window.open('https://drive.google.com/drive/u/2/folders/1U1kCOzs93iS89azrcBKjqPgEEK85D-g0', '_blank');
+  };
   
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white">
@@ -73,6 +103,21 @@ export default function LoginPage() {
             Maneja tus finanzas de forma consciente y colaborativa
           </p>
         </div>
+
+        {/* Botón de descarga - solo visible para usuarios regulares */}
+        {showAppDownload && (
+          <div className="mb-6">
+            <button
+              onClick={handleDownloadApp}
+              className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-xl font-bold text-lg shadow-lg hover:from-green-600 hover:to-green-700 transition flex items-center justify-center gap-3"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              📱 Descarga la App aquí
+            </button>
+          </div>
+        )}
 
         <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
           <form onSubmit={handleLogin} className="space-y-5">

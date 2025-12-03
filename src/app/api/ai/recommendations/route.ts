@@ -23,7 +23,21 @@ export async function POST(req: Request) {
     const decoded = await getAuth().verifyIdToken(token);
     const userId = decoded.uid;
 
-    const { recType, recSummary: userQuestion, recFull, score } = await req.json();
+    const { recType, recSummary: userQuestion, recFull, score, conversationId } = await req.json();
+
+    // Verificar que la conversación existe y pertenece al usuario (si se proporciona)
+    if (conversationId) {
+      const conversation = await prisma.conversation.findFirst({
+        where: {
+          id: conversationId,
+          userId,
+        },
+      });
+
+      if (!conversation) {
+        return NextResponse.json({ error: "Conversación no encontrada" }, { status: 404 });
+      }
+    }
 
     // 1) Obtener datos relevantes del usuario (últimas transacciones, ingresos, presupuestos)
     const recentTx = await prisma.transaction.findMany({
@@ -181,13 +195,30 @@ Analiza los datos y proporciona una recomendación personalizada en formato JSON
     const recommendation = await prisma.aiRecommendation.create({
       data: {
         userId,
+        conversationId: conversationId || null,
         recType,
         recSummary: aiResult.recSummary ?? userQuestion,
         recFull: aiResult.recFull ?? recFull,
+        inputJson: { userQuestion: userQuestion || "", context: summary }, // Guardamos la pregunta del usuario y el contexto
         score: aiResult.score ?? score,
         model: MODEL_NAME,
       },
     });
+
+    // Si es el primer mensaje de la conversación, generar título automáticamente
+    if (conversationId) {
+      const messageCount = await prisma.aiRecommendation.count({
+        where: { conversationId },
+      });
+
+      if (messageCount === 1 && userQuestion) {
+        const autoTitle = userQuestion.length > 50 ? userQuestion.substring(0, 50) + "..." : userQuestion;
+        await prisma.conversation.update({
+          where: { id: conversationId },
+          data: { title: autoTitle },
+        });
+      }
+    }
 
     return NextResponse.json(recommendation);
   } catch (error) {
