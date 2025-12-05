@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
 import "@/lib/firebaseAdmin";
 import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 /**
  * Endpoint para procesar transacciones por voz
@@ -17,6 +18,8 @@ const client = new OpenAI({
   apiKey: process.env.GEMINI_API_KEY,
   baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
 });
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 export async function POST(req: Request) {
   try {
@@ -59,26 +62,32 @@ export async function POST(req: Request) {
     const arrayBuffer = await audioFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // 🗣️ PASO 1: Transcribir el audio usando Gemini (via OpenAI SDK)
-    console.log(`[Voice] Transcribiendo audio para usuario ${userId}...`);
+    // 🗣️ PASO 1: Transcribir el audio usando Gemini nativo
+    console.log(`[Voice] Transcribiendo audio con Gemini para usuario ${userId}...`);
     
     let transcription = "";
     try {
-      // Nota: Gemini soporta transcripción de audio a través de la API de OpenAI
-      const transcriptionResponse = await client.audio.transcriptions.create({
-        file: new File([buffer], audioFile.name || "audio.webm", {
-          type: audioFile.type || "audio/webm",
-        }),
-        model: "whisper-1", // Gemini acepta este formato
-        language: "es", // Español
-      });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-      transcription = transcriptionResponse.text;
-      console.log(`[Voice] Transcripción: "${transcription}"`);
+      const result = await model.generateContent([
+        {
+          inlineData: {
+            data: buffer.toString("base64"),
+            mimeType: audioFile.type || "audio/m4a",
+          },
+        },
+        "Transcribe este audio al español. Devuelve SOLO el texto transcrito, sin explicaciones adicionales.",
+      ]);
+
+      transcription = result.response.text().trim();
+      console.log(`[Voice] ✅ Transcripción exitosa: "${transcription}"`);
     } catch (transcriptionError) {
-      console.error("[Voice] Error en transcripción:", transcriptionError);
+      console.error("[Voice] ❌ Error en transcripción:", transcriptionError);
       return NextResponse.json(
-        { error: "Error al transcribir el audio. Intenta de nuevo." },
+        { 
+          error: "Error al transcribir el audio. Intenta de nuevo.",
+          details: transcriptionError instanceof Error ? transcriptionError.message : "Unknown error"
+        },
         { status: 500 }
       );
     }
@@ -141,7 +150,7 @@ Responde SOLO con un JSON válido, sin explicaciones:
 
     try {
       const completion = await client.chat.completions.create({
-        model: "gemini-2.5-flash",
+        model: "gemini-2.0-flash-exp",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: transcription },
