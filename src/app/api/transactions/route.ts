@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
+import { NotificationService } from "@/app/api/notifications/service";
 import "@/lib/firebaseAdmin";
 
 /* 🟢 CREAR transacción */
@@ -64,6 +65,71 @@ export async function POST(req: Request) {
         detail: { amount, categoryId, note },
       },
     });
+
+    // 🔔 Verificar presupuesto y enviar notificaciones si es un gasto
+    if (type === "expense" && categoryId) {
+      try {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+        // Buscar presupuesto del mes actual
+        const budget = await prisma.budget.findFirst({
+          where: {
+            userId,
+            categoryId,
+            month: {
+              gte: startOfMonth,
+              lte: endOfMonth,
+            },
+          },
+          include: { category: true },
+        });
+
+        if (budget) {
+          // Calcular total gastado en el mes
+          const totalSpentResult = await prisma.transaction.aggregate({
+            where: {
+              userId,
+              categoryId,
+              type: "expense",
+              isDeleted: false,
+              occurredAt: {
+                gte: startOfMonth,
+                lte: endOfMonth,
+              },
+            },
+            _sum: { amount: true },
+          });
+
+          const totalSpent = Number(totalSpentResult._sum.amount || 0);
+          const budgetAmount = Number(budget.amount);
+          const percentage = (totalSpent / budgetAmount) * 100;
+
+          // Notificar si se excede el 100%
+          if (percentage >= 100) {
+            await NotificationService.notifyBudgetExceeded(
+              userId,
+              budget.category?.name || "Sin categoría",
+              budgetAmount,
+              totalSpent
+            );
+          }
+          // Notificar advertencia al 80%
+          else if (percentage >= 80) {
+            await NotificationService.notifyBudgetWarning(
+              userId,
+              budget.category?.name || "Sin categoría",
+              budgetAmount,
+              totalSpent
+            );
+          }
+        }
+      } catch (notifError) {
+        // No fallar la transacción si falla la notificación
+        console.error("Error al enviar notificación de presupuesto:", notifError);
+      }
+    }
 
     // Devolver respuesta con datos actualizados
     return NextResponse.json({

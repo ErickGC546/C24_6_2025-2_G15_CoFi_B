@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { prisma } from "@/lib/prisma";
+import { NotificationService } from "@/app/api/notifications/service";
 import "@/lib/firebaseAdmin";
 
 /* 🟣 LISTAR MIEMBROS DE UN GRUPO */
@@ -97,7 +98,27 @@ export async function DELETE(req: Request) {
     if (!requester || requester.role !== "owner")
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
 
+    // 🔔 Obtener información antes de eliminar para la notificación
+    const user = await prisma.user.findUnique({
+      where: { id: member.userId },
+      select: { name: true, email: true },
+    });
+    const userName = user?.name || user?.email || "Un miembro";
+    const groupName = member.group.name;
+
     await prisma.groupMember.delete({ where: { id: memberId } });
+
+    // 🔔 Notificar a otros miembros del grupo
+    try {
+      await NotificationService.notifyMemberLeft(
+        member.groupId,
+        userName,
+        groupName,
+        member.userId // Excluir al usuario que fue eliminado
+      );
+    } catch (notifError) {
+      console.error("Error al enviar notificación de miembro eliminado:", notifError);
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

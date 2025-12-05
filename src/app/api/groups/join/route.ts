@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuth, type DecodedIdToken } from "firebase-admin/auth";
 import { prisma } from "@/lib/prisma";
+import { NotificationService } from "@/app/api/notifications/service";
 import "@/lib/firebaseAdmin";
 
 /* 🟢 UNIRSE A UN GRUPO POR CÓDIGO */
@@ -69,6 +70,24 @@ export async function POST(req: Request) {
     await prisma.auditLog.create({
       data: { actorId: userId, action: "Se unió al grupo por código", detail: { groupId: group.id } },
     });
+
+    // 🔔 Notificar a otros miembros del grupo
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true, email: true },
+      });
+      const userName = user?.name || user?.email || "Un nuevo miembro";
+
+      await NotificationService.notifyMemberJoined(
+        group.id,
+        userName,
+        group.name,
+        userId // Excluir al usuario que se acaba de unir
+      );
+    } catch (notifError) {
+      console.error("Error al enviar notificación de nuevo miembro:", notifError);
+    }
 
     return NextResponse.json({
       message: "Te has unido al grupo correctamente",

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { prisma } from "@/lib/prisma";
+import { NotificationService } from "@/app/api/notifications/service";
 import "@/lib/firebaseAdmin";
 
 // temporal: alias para evitar errores TS hasta regenerar cliente prisma en CI/editor
@@ -124,6 +125,51 @@ export async function POST(req: Request) {
 
     const movement = txResults[0];
     const updatedGoal = txResults[1];
+
+    // 🔔 Verificar si se alcanzó la meta y enviar notificaciones
+    try {
+      const currentAmount = Number(updatedGoal.currentAmount);
+      const targetAmount = Number(updatedGoal.targetAmount);
+
+      // Notificar meta alcanzada (solo al alcanzar exactamente o superar)
+      if (type === "deposit" && currentAmount >= targetAmount && (currentAmount - amt) < targetAmount) {
+        await NotificationService.notifyGoalAchieved(
+          updatedGoal.userId,
+          updatedGoal.title,
+          targetAmount
+        );
+      }
+
+      // Notificar movimientos grupales
+      if (goal.groupId) {
+        const user = await prisma.user.findUnique({
+          where: { id: decoded.uid },
+          select: { name: true, email: true },
+        });
+        const userName = user?.name || user?.email || "Un miembro";
+
+        if (type === "deposit") {
+          await NotificationService.notifyGroupContribution(
+            goal.groupId,
+            userName,
+            updatedGoal.title,
+            amt,
+            decoded.uid // Excluir al usuario que hizo el aporte
+          );
+        } else if (type === "withdraw") {
+          await NotificationService.notifyGroupWithdrawal(
+            goal.groupId,
+            userName,
+            updatedGoal.title,
+            amt,
+            decoded.uid // Excluir al usuario que hizo el retiro
+          );
+        }
+      }
+    } catch (notifError) {
+      // No fallar la operación si falla la notificación
+      console.error("Error al enviar notificación de movimiento:", notifError);
+    }
 
     return NextResponse.json({ movement, updatedGoal });
   } catch (error) {

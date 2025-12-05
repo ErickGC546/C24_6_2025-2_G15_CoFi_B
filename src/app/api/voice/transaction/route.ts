@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     
     let transcription = "";
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
       const result = await model.generateContent([
         {
