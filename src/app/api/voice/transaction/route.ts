@@ -62,18 +62,41 @@ export async function POST(req: Request) {
     const arrayBuffer = await audioFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    // 📝 Log para debug: ver tipo de archivo recibido
+    console.log(`[Voice] Archivo recibido: ${audioFile.name}, tipo: ${audioFile.type}, tamaño: ${audioFile.size} bytes`);
+
     // 🗣️ PASO 1: Transcribir el audio usando Gemini nativo
     console.log(`[Voice] Transcribiendo audio con Gemini para usuario ${userId}...`);
     
     let transcription = "";
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+      // Determinar el MIME type correcto
+      let mimeType = audioFile.type;
+      
+      // Si no viene el tipo o es genérico, inferir del nombre
+      if (!mimeType || mimeType === 'application/octet-stream') {
+        if (audioFile.name.endsWith('.webm')) {
+          mimeType = 'audio/webm';
+        } else if (audioFile.name.endsWith('.m4a')) {
+          mimeType = 'audio/m4a';
+        } else if (audioFile.name.endsWith('.mp3')) {
+          mimeType = 'audio/mp3';
+        } else if (audioFile.name.endsWith('.wav')) {
+          mimeType = 'audio/wav';
+        } else {
+          mimeType = 'audio/webm'; // Default para navegadores modernos
+        }
+      }
+
+      console.log(`[Voice] Usando MIME type: ${mimeType}`);
 
       const result = await model.generateContent([
         {
           inlineData: {
             data: buffer.toString("base64"),
-            mimeType: audioFile.type || "audio/m4a",
+            mimeType,
           },
         },
         "Transcribe este audio al español. Devuelve SOLO el texto transcrito, sin explicaciones adicionales.",
@@ -194,6 +217,8 @@ Responde SOLO con un JSON válido, sin explicaciones:
     let categoryId: string | null = null;
 
     if (parsedData.categoryName) {
+      console.log(`[Voice] 🔍 Buscando categoría: "${parsedData.categoryName}"`);
+      
       // Buscar categoría primero en las del usuario, luego en las predeterminadas del sistema
       const category = await prisma.category.findFirst({
         where: {
@@ -229,9 +254,12 @@ Responde SOLO con un JSON válido, sin explicaciones:
       } else {
         console.log(`[Voice] ⚠️ No se encontró categoría "${parsedData.categoryName}" (ni del usuario ni predeterminada)`);
       }
+    } else {
+      console.log(`[Voice] ⚠️ No se especificó categoría en el audio`);
     }
 
     // 💾 PASO 4: Crear la transacción (reutilizando lógica de /api/transactions)
+    console.log(`[Voice] 💾 Creando transacción: ${parsedData.type}, monto: ${parsedData.amount}`);
     
     // Buscar o crear cuenta principal
     let account = await prisma.account.findFirst({ where: { userId } });

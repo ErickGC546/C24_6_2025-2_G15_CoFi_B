@@ -11,6 +11,10 @@ const client = new OpenAI({
 
 const MODEL_NAME = "gemini-2.5-pro";
 
+// Variables para evitar llamadas duplicadas
+let lastSavedRecommendation = '';
+let lastSavedTime = 0;
+
 /* 🟢 CREAR NUEVA RECOMENDACIÓN */
 export async function POST(req: Request) {
   try {
@@ -445,6 +449,32 @@ Analiza los datos y proporciona una recomendación personalizada en formato JSON
     }
 
     const aiResult = await generateAIFeedback(summary);
+
+    // Crear un identificador único para esta recomendación
+    const recommendationKey = `${userId}-${aiResult.recSummary ?? userQuestion}-${conversationId || 'no-conv'}`;
+    const currentTime = Date.now();
+    
+    // Si es la misma recomendación y fue guardada hace menos de 2 segundos, salir
+    if (recommendationKey === lastSavedRecommendation && (currentTime - lastSavedTime) < 2000) {
+      console.log('Duplicado detectado - no se guarda');
+      // Buscar la última recomendación guardada para devolverla
+      const lastRecommendation = await prisma.aiRecommendation.findFirst({
+        where: {
+          userId,
+          conversationId: conversationId || null,
+          recSummary: aiResult.recSummary ?? userQuestion,
+        },
+        orderBy: { generatedAt: 'desc' },
+      });
+      
+      if (lastRecommendation) {
+        return NextResponse.json(lastRecommendation);
+      }
+    }
+    
+    // Actualizar variables de control
+    lastSavedRecommendation = recommendationKey;
+    lastSavedTime = currentTime;
 
     const recommendation = await prisma.aiRecommendation.create({
       data: {
