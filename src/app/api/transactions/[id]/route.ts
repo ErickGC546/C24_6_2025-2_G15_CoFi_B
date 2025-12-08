@@ -25,9 +25,17 @@ export async function PUT(
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
+    // ✅✅ ASEGURAR QUE EL AMOUNT TENGA EL SIGNO CORRECTO
+    const finalAmount = type === 'income' ? Math.abs(amount) : -Math.abs(amount);
+
     const updated = await prisma.transaction.update({
       where: { id },
-      data: { amount, note, categoryId, type },
+      data: { 
+        amount: finalAmount,  // ← Guardar con el signo correcto
+        note, 
+        categoryId, 
+        type 
+      },
     });
 
     // ✅ CALCULAR NUEVO BALANCE
@@ -38,36 +46,32 @@ export async function PUT(
       },
       select: {
         amount: true,
-        type: true,
       },
     });
 
-    const newBalance = transactions.reduce((sum, t) => {
-      return t.type === "income" 
-        ? sum + t.amount.toNumber() 
-        : sum - t.amount.toNumber();
-    }, 0);
+    const newBalance = transactions.reduce((sum, t) => sum + t.amount.toNumber(), 0);
 
-    // ✅ ACTUALIZAR BALANCE EN LA CUENTA
-    if (updated.accountId) {
-      await prisma.account.update({
-        where: { id: updated.accountId },
-        data: { balance: newBalance },
-      });
-    }
+    // ✅✅ ACTUALIZAR EL BALANCE EN LA TABLA ACCOUNT
+    await prisma.account.updateMany({
+      where: {
+        userId: decoded.uid,
+      },
+      data: {
+        balance: newBalance,
+      },
+    });
 
     await prisma.auditLog.create({
       data: {
         actorId: decoded.uid,
         action: `Editó una transacción`,
-        detail: { id, amount, note },
+        detail: { id, amount: finalAmount, note },
       },
     });
 
-    // ✅ SERIALIZAR CORRECTAMENTE (convertir Decimal a number)
     return NextResponse.json({
       id: updated.id,
-      amount: updated.amount.toNumber(), // ← Convertir Decimal
+      amount: updated.amount.toNumber(),
       note: updated.note,
       type: updated.type,
       categoryId: updated.categoryId,
