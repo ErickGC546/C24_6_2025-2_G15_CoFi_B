@@ -70,7 +70,7 @@ export async function POST(req: Request) {
     
     let transcription = "";
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
       // Determinar el MIME type correcto
       let mimeType = audioFile.type;
