@@ -170,6 +170,8 @@ Responde SOLO con un JSON válido, sin explicaciones:
       description: string;
       categoryName: string;
     };
+    // Guarda la respuesta cruda de la IA para poder reintentar el parseo si es necesario
+    let aiResponse = "{}";
 
     try {
       const completion = await client.chat.completions.create({
@@ -181,8 +183,7 @@ Responde SOLO con un JSON válido, sin explicaciones:
         temperature: 0.3, // Baja temperatura para respuestas más consistentes
         max_tokens: 200,
       });
-
-      const aiResponse = completion.choices[0]?.message?.content || "{}";
+      aiResponse = completion.choices[0]?.message?.content || "{}";
       console.log(`[Voice] Respuesta de IA: ${aiResponse}`);
 
       // Limpiar la respuesta (a veces la IA incluye markdown)
@@ -203,14 +204,58 @@ Responde SOLO con un JSON válido, sin explicaciones:
 
     } catch (parseError) {
       console.error("[Voice] Error al parsear respuesta de IA:", parseError);
-      return NextResponse.json(
-        {
-          error: "No se pudo procesar la información. Intenta ser más específico.",
-          transcription,
-          debug: parseError instanceof Error ? parseError.message : "Unknown error",
-        },
-        { status: 400 }
-      );
+
+      // Intento de recuperación: pedirle al modelo que convierta su respuesta previa en JSON
+      try {
+        const recovery = await client.chat.completions.create({
+          model: "gemini-2.0-flash-exp",
+          messages: [
+            { role: "system", content: systemPrompt },
+            {
+              role: "user",
+              content: `La respuesta anterior del asistente fue:\n\n${aiResponse}\n\nPor favor, devuelve SOLO el JSON con la estructura solicitada. Si no puedes extraer monto o categoría, pon amount: 0 y categoryName: "".`,
+            },
+          ],
+          temperature: 0,
+          max_tokens: 200,
+        });
+
+        const recoveryText = recovery.choices[0]?.message?.content || "";
+        console.log(`[Voice] Recuperación IA: ${recoveryText}`);
+        const jsonMatch2 = recoveryText.match(/\{[\s\S]*\}/);
+        const jsonString2 = jsonMatch2 ? jsonMatch2[0] : recoveryText;
+        parsedData = JSON.parse(jsonString2);
+
+        // Validaciones básicas de nuevo
+        if (!parsedData.type || !parsedData.amount || parsedData.amount <= 0) {
+          console.error("[Voice] Recuperación fallida: datos inválidos", parsedData);
+          return NextResponse.json(
+            {
+              error: "No se pudo procesar la información después de intentar recuperarla.",
+              transcription,
+              aiResponse,
+              debug: parseError instanceof Error ? parseError.message : String(parseError),
+            },
+            { status: 400 }
+          );
+        }
+
+        if (!["expense", "income"].includes(parsedData.type)) {
+          parsedData.type = "expense";
+        }
+
+      } catch (recoveryError) {
+        console.error("[Voice] Fallback parse failed:", recoveryError);
+        return NextResponse.json(
+          {
+            error: "No se pudo procesar la información. Intenta ser más específico.",
+            transcription,
+            aiResponse,
+            debug: parseError instanceof Error ? parseError.message : String(parseError),
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // 🔍 PASO 3: Buscar la categoría en la base de datos
