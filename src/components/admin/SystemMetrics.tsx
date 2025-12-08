@@ -5,24 +5,33 @@ interface SystemMetricsProps {
 }
 
 export default function SystemMetrics({ stats }: SystemMetricsProps) {
+  // Calcular usuarios activos hoy (basado en transacciones del día)
+  const activeUsersToday = stats?.activeUsersData?.reduce((sum: number, item: any) => sum + item.usuarios, 0) || 0;
+  
+  // Calcular transacciones de hoy
+  const transactionsToday = stats?.transactionsByDay?.reduce((sum: number, item: any) => sum + item.count, 0) || 0;
+  
+  // Calcular tasa de retención (usuarios que tienen transacciones en los últimos 7 días)
+  const retentionRate = stats?.totalUsers > 0 ? Math.round((activeUsersToday / stats.totalUsers) * 100) : 0;
+  
   const metrics = [
     {
       title: 'Tasa de Retención',
-      value: '85%',
-      change: '+5%',
-      trend: 'up',
+      value: `${retentionRate}%`,
+      change: retentionRate > 50 ? '+5%' : '0%',
+      trend: retentionRate > 50 ? 'up' : 'neutral',
       icon: '🎯',
-      description: 'Usuarios que vuelven después de 7 días',
+      description: 'Usuarios activos vs total de usuarios',
       bgColor: 'bg-blue-50',
       textColor: 'text-blue-600'
     },
     {
       title: 'Usuarios Activos Diarios',
-      value: '2',
+      value: activeUsersToday.toString(),
       change: '0%',
       trend: 'neutral',
       icon: '👥',
-      description: 'Usuarios activos hoy',
+      description: 'Usuarios con actividad hoy',
       bgColor: 'bg-green-50',
       textColor: 'text-green-600'
     },
@@ -38,21 +47,21 @@ export default function SystemMetrics({ stats }: SystemMetricsProps) {
     },
     {
       title: 'Transacciones Diarias',
-      value: '0',
-      change: '0%',
-      trend: 'neutral',
+      value: transactionsToday.toString(),
+      change: transactionsToday > 0 ? '+' + transactionsToday : '0',
+      trend: transactionsToday > 0 ? 'up' : 'neutral',
       icon: '💳',
-      description: 'Transacciones registradas hoy',
+      description: 'Transacciones en la última semana',
       bgColor: 'bg-orange-50',
       textColor: 'text-orange-600'
     },
     {
       title: 'Grupos Activos',
-      value: stats?.activeGroups || '0',
+      value: (stats?.activeGroups || 0).toString(),
       change: '0%',
       trend: 'neutral',
       icon: '👨‍👩‍👧‍👦',
-      description: 'Grupos con actividad reciente',
+      description: 'Total de grupos en la plataforma',
       bgColor: 'bg-pink-50',
       textColor: 'text-pink-600'
     },

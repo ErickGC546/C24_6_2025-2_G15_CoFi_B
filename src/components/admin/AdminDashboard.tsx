@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { auth } from '@/lib/firebase';
-import AdminStatsCards from './AdminStatsCards';
-import RecentTransactionsTable from './RecentTransactionsTable';
+
 import RecentUsersTable from './RecentUsersTable';
 import AdminCharts from './AdminCharts';
 import SystemMetrics from './SystemMetrics';
@@ -116,20 +115,11 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
             </p>
           </div>
 
-          {/* Tarjetas de estadísticas principales */}
-          <AdminStatsCards stats={adminStats} loading={loadingStats} />
-
           {/* Métricas del sistema */}
           <SystemMetrics stats={adminStats} />
 
           {/* Gráficos de análisis */}
           <AdminCharts stats={adminStats} />
-
-          {/* Últimas transacciones */}
-          <RecentTransactionsTable 
-            transactions={adminStats?.recentTransactions || []} 
-            loading={loadingStats}
-          />
 
           {/* Usuarios recientes */}
           <RecentUsersTable 

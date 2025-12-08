@@ -86,115 +86,217 @@ export async function GET(req: Request) {
     const sixMonthsAgo = new Date();
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
     sixMonthsAgo.setDate(1);
+    sixMonthsAgo.setHours(0, 0, 0, 0);
 
-    const usersByMonth = await prisma.$queryRaw<Array<{ month: string; count: bigint }>>`
-      SELECT 
-        TO_CHAR(created_at, 'Mon') as month,
-        COUNT(*)::bigint as count
-      FROM "User"
-      WHERE created_at >= ${sixMonthsAgo}
-      GROUP BY TO_CHAR(created_at, 'Mon'), DATE_TRUNC('month', created_at)
-      ORDER BY DATE_TRUNC('month', created_at)
-    `;
+    // Obtener todos los usuarios con su fecha de creación
+    const allUsers = await prisma.user.findMany({
+      where: {
+        createdAt: { gte: sixMonthsAgo }
+      },
+      select: {
+        createdAt: true
+      },
+      orderBy: {
+        createdAt: 'asc'
+      }
+    });
 
-    const userGrowth = usersByMonth.map(row => ({
-      mes: row.month,
-      usuarios: Number(row.count)
+    // Agrupar por mes manualmente
+    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const usersByMonthMap = new Map<string, number>();
+    
+    // Inicializar últimos 6 meses con 0
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      const key = `${monthNames[date.getMonth()]}`;
+      usersByMonthMap.set(key, 0);
+    }
+
+    // Contar usuarios por mes
+    allUsers.forEach(user => {
+      const month = monthNames[user.createdAt.getMonth()];
+      usersByMonthMap.set(month, (usersByMonthMap.get(month) || 0) + 1);
+    });
+
+    const userGrowth = Array.from(usersByMonthMap.entries()).map(([mes, usuarios]) => ({
+      mes,
+      usuarios
     }));
 
     // 8. Transacciones por día de la semana (últimos 7 días)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
 
-    const transactionsByDay = await prisma.$queryRaw<Array<{ day: string; count: bigint }>>`
-      SELECT 
-        TO_CHAR(occurred_at, 'Dy') as day,
-        COUNT(*)::bigint as count
-      FROM "Transaction"
-      WHERE occurred_at >= ${sevenDaysAgo}
-        AND is_deleted = false
-      GROUP BY TO_CHAR(occurred_at, 'Dy'), DATE_TRUNC('day', occurred_at)
-      ORDER BY DATE_TRUNC('day', occurred_at)
-    `;
+    // Obtener todas las transacciones de los últimos 7 días
+    const recentTransactionsForChart = await prisma.transaction.findMany({
+      where: {
+        occurredAt: { gte: sevenDaysAgo },
+        isDeleted: false
+      },
+      select: {
+        occurredAt: true
+      },
+      orderBy: {
+        occurredAt: 'asc'
+      }
+    });
 
-    const transactionsByDayFormatted = transactionsByDay.map(row => ({
-      dia: row.day,
-      count: Number(row.count)
+    // Agrupar por día
+    const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    const transactionsByDayMap = new Map<string, number>();
+    
+    // Inicializar últimos 7 días
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dayName = dayNames[date.getDay()];
+      if (!transactionsByDayMap.has(dayName)) {
+        transactionsByDayMap.set(dayName, 0);
+      }
+    }
+
+    // Contar transacciones por día
+    recentTransactionsForChart.forEach(transaction => {
+      const dayName = dayNames[transaction.occurredAt.getDay()];
+      transactionsByDayMap.set(dayName, (transactionsByDayMap.get(dayName) || 0) + 1);
+    });
+
+    const transactionsByDayFormatted = Array.from(transactionsByDayMap.entries()).map(([dia, count]) => ({
+      dia,
+      count
     }));
 
-    // 9. Gastos por categoría
-    const expensesByCategory = await prisma.transaction.groupBy({
-      by: ['categoryId'],
+    // 9. Gastos por categoría (del mes actual)
+    const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+    
+    const expensesThisMonth = await prisma.transaction.findMany({
       where: {
         type: 'expense',
         isDeleted: false,
         occurredAt: { gte: startOfMonth, lte: endOfMonth },
+        categoryId: { not: null }
       },
-      _sum: { amount: true },
+      select: {
+        categoryId: true,
+        amount: true,
+        category: {
+          select: {
+            name: true
+          }
+        }
+      }
     });
 
-    const categoriesData = await prisma.category.findMany({
-      where: {
-        id: { in: expensesByCategory.map(e => e.categoryId).filter(Boolean) as string[] },
-      },
-      select: { id: true, name: true },
+    // Agrupar por categoría
+    const categoryTotals = new Map<string, { name: string; value: number }>();
+    
+    expensesThisMonth.forEach(expense => {
+      if (expense.categoryId && expense.category) {
+        const existing = categoryTotals.get(expense.categoryId);
+        if (existing) {
+          existing.value += Number(expense.amount);
+        } else {
+          categoryTotals.set(expense.categoryId, {
+            name: expense.category.name,
+            value: Number(expense.amount)
+          });
+        }
+      }
     });
 
-    const categoryMap = new Map(categoriesData.map(c => [c.id, c.name]));
-
-    const expensesByCategoryFormatted = expensesByCategory
-      .filter(e => e.categoryId)
-      .map((e, index) => ({
-        name: categoryMap.get(e.categoryId!) || 'Sin categoría',
-        value: Number(e._sum.amount || 0),
-        color: COLORS[index % COLORS.length]
-      }));
+    const expensesByCategoryFormatted = Array.from(categoryTotals.values()).map((cat, index) => ({
+      name: cat.name,
+      value: cat.value,
+      color: COLORS[index % COLORS.length]
+    }));
 
     // 10. Ingresos vs Gastos por mes (últimos 6 meses)
-    const monthlyData = await prisma.$queryRaw<Array<{ 
-      month: string; 
-      expenses: number; 
-      income: number 
-    }>>`
-      SELECT 
-        TO_CHAR(occurred_at, 'Mon') as month,
-        SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END)::float as expenses,
-        SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END)::float as income
-      FROM "Transaction"
-      WHERE occurred_at >= ${sixMonthsAgo}
-        AND is_deleted = false
-      GROUP BY TO_CHAR(occurred_at, 'Mon'), DATE_TRUNC('month', occurred_at)
-      ORDER BY DATE_TRUNC('month', occurred_at)
-    `;
+    const allTransactions = await prisma.transaction.findMany({
+      where: {
+        occurredAt: { gte: sixMonthsAgo },
+        isDeleted: false,
+        type: { in: ['income', 'expense'] }
+      },
+      select: {
+        occurredAt: true,
+        type: true,
+        amount: true
+      },
+      orderBy: {
+        occurredAt: 'asc'
+      }
+    });
 
-    const monthlyRevenue = monthlyData.map(row => ({
-      mes: row.month,
-      gastos: row.expenses,
-      ingresos: row.income
+    // Agrupar por mes
+    const monthlyRevenueMap = new Map<string, { gastos: number; ingresos: number }>();
+    
+    // Inicializar últimos 6 meses
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      const key = monthNames[date.getMonth()];
+      monthlyRevenueMap.set(key, { gastos: 0, ingresos: 0 });
+    }
+
+    // Sumar transacciones
+    allTransactions.forEach(transaction => {
+      const month = monthNames[transaction.occurredAt.getMonth()];
+      const existing = monthlyRevenueMap.get(month);
+      if (existing) {
+        if (transaction.type === 'expense') {
+          existing.gastos += Number(transaction.amount);
+        } else if (transaction.type === 'income') {
+          existing.ingresos += Number(transaction.amount);
+        }
+      }
+    });
+
+    const monthlyRevenue = Array.from(monthlyRevenueMap.entries()).map(([mes, data]) => ({
+      mes,
+      gastos: data.gastos,
+      ingresos: data.ingresos
     }));
 
     // 11. Actividad de usuarios por hora (últimas 24 horas)
     const twentyFourHoursAgo = new Date();
     twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
 
-    const activityByHour = await prisma.$queryRaw<Array<{ hour: string; count: bigint }>>`
-      SELECT 
-        TO_CHAR(occurred_at, 'HH24:00') as hour,
-        COUNT(DISTINCT user_id)::bigint as count
-      FROM "Transaction"
-      WHERE occurred_at >= ${twentyFourHoursAgo}
-        AND is_deleted = false
-        AND user_id IS NOT NULL
-      GROUP BY TO_CHAR(occurred_at, 'HH24:00')
-      ORDER BY TO_CHAR(occurred_at, 'HH24:00')
-    `;
+    const recentActivity = await prisma.transaction.findMany({
+      where: {
+        occurredAt: { gte: twentyFourHoursAgo },
+        isDeleted: false,
+        userId: { not: null }
+      },
+      select: {
+        occurredAt: true,
+        userId: true
+      },
+      orderBy: {
+        occurredAt: 'asc'
+      }
+    });
 
-    const activeUsersData = activityByHour.map(row => ({
-      hora: row.hour,
-      usuarios: Number(row.count)
-    }));
+    // Agrupar por hora y contar usuarios únicos
+    const hourlyActivity = new Map<string, Set<string>>();
+    
+    recentActivity.forEach(activity => {
+      if (activity.userId) {
+        const hour = `${activity.occurredAt.getHours().toString().padStart(2, '0')}:00`;
+        if (!hourlyActivity.has(hour)) {
+          hourlyActivity.set(hour, new Set());
+        }
+        hourlyActivity.get(hour)!.add(activity.userId);
+      }
+    });
 
-    const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+    const activeUsersData = Array.from(hourlyActivity.entries())
+      .map(([hora, users]) => ({
+        hora,
+        usuarios: users.size
+      }))
+      .sort((a, b) => a.hora.localeCompare(b.hora));
 
     return NextResponse.json({ 
       totalUsers, 
