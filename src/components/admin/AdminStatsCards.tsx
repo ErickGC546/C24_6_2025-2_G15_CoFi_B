@@ -37,27 +37,6 @@ export default function AdminStatsCards({ stats, loading }: AdminStatsCardsProps
       subtitle: 'Total de grupos en la plataforma',
       bgColor: 'bg-blue-50'
     },
-    {
-      icon: '💸',
-      label: 'Gastos (mes)',
-      value: `S/ ${Number(stats?.totalExpensesMonth ?? mockKpis.totalExpensesMonth).toFixed(2)}`,
-      subtitle: 'Total gastado este mes',
-      bgColor: 'bg-yellow-50'
-    },
-    {
-      icon: '🔁',
-      label: 'Transacciones (mes)',
-      value: stats?.totalTransactionsMonth ?? mockKpis.totalTransactionsMonth,
-      subtitle: 'Número de transacciones',
-      bgColor: 'bg-purple-50'
-    },
-    {
-      icon: '📈',
-      label: 'Promedio por usuario',
-      value: `S/ ${Number(stats?.avgExpensePerUser ?? mockKpis.avgExpensePerUser).toFixed(2)}`,
-      subtitle: 'Promedio de gasto por usuario',
-      bgColor: 'bg-indigo-50'
-    }
   ];
 
   if (loading) {

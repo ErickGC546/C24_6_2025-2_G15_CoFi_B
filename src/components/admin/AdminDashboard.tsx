@@ -5,6 +5,8 @@ import { auth } from '@/lib/firebase';
 import AdminStatsCards from './AdminStatsCards';
 import RecentTransactionsTable from './RecentTransactionsTable';
 import RecentUsersTable from './RecentUsersTable';
+import AdminCharts from './AdminCharts';
+import SystemMetrics from './SystemMetrics';
 
 interface AdminStats {
   totalUsers?: number;
@@ -110,12 +112,18 @@ export default function AdminDashboard({ userName }: AdminDashboardProps) {
               Panel de administración
             </h2>
             <p className="text-gray-600 mt-1">
-              {loadingStats ? 'Cargando estadísticas...' : 'Accesos rápidos y métricas principales.'}
+              {loadingStats ? 'Cargando estadísticas...' : 'Métricas y análisis del sistema en tiempo real.'}
             </p>
           </div>
 
-          {/* Tarjetas de estadísticas */}
+          {/* Tarjetas de estadísticas principales */}
           <AdminStatsCards stats={adminStats} loading={loadingStats} />
+
+          {/* Métricas del sistema */}
+          <SystemMetrics stats={adminStats} />
+
+          {/* Gráficos de análisis */}
+          <AdminCharts stats={adminStats} />
 
           {/* Últimas transacciones */}
           <RecentTransactionsTable 
