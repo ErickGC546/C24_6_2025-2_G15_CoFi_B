@@ -29,6 +29,20 @@ export async function PUT(
       where: { id },
       data: { amount, note, categoryId, type },
     });
+
+    // ✅ CALCULAR NUEVO BALANCE
+    const transactions = await prisma.transaction.findMany({
+      where: {
+        userId: decoded.uid,
+        isDeleted: false,
+      },
+      select: {
+        amount: true,
+      },
+    });
+
+    const newBalance = transactions.reduce((sum, t) => sum + t.amount.toNumber(), 0);
+
     await prisma.auditLog.create({
       data: {
         actorId: decoded.uid,
@@ -37,7 +51,21 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json(updated);
+    // ✅ SERIALIZAR CORRECTAMENTE (convertir Decimal a number)
+    return NextResponse.json({
+      id: updated.id,
+      amount: updated.amount.toNumber(), // ← Convertir Decimal
+      note: updated.note,
+      type: updated.type,
+      categoryId: updated.categoryId,
+      userId: updated.userId,
+      occurredAt: updated.occurredAt,
+      createdAt: updated.createdAt,
+      updatedAt: updated.updatedAt,
+      isDeleted: updated.isDeleted,
+      goalId: updated.goalId,
+      newBalance, // ← Nuevo balance
+    });
   } catch (error) {
     console.error("Error en PUT /transactions/[id]:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
@@ -68,6 +96,20 @@ export async function DELETE(
       where: { id },
       data: { isDeleted: true },
     });
+
+    // ✅ CALCULAR NUEVO BALANCE (sin la transacción eliminada)
+    const transactions = await prisma.transaction.findMany({
+      where: {
+        userId: decoded.uid,
+        isDeleted: false,
+      },
+      select: {
+        amount: true,
+      },
+    });
+
+    const newBalance = transactions.reduce((sum, t) => sum + t.amount.toNumber(), 0);
+
     await prisma.auditLog.create({
       data: {
         actorId: decoded.uid,
@@ -76,7 +118,11 @@ export async function DELETE(
       },
     });
 
-    return NextResponse.json({ success: true });
+    // ✅ DEVOLVER SUCCESS Y NUEVO BALANCE
+    return NextResponse.json({
+      success: true,
+      newBalance, // ← Agregar el nuevo balance
+    });
   } catch (error) {
     console.error("Error en DELETE /transactions/[id]:", error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });

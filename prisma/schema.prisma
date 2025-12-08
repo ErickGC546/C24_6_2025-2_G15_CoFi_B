@@ -206,6 +206,7 @@ model Transaction {
   currency   String          @default("PEN")
   categoryId String?         @map("category_id")
   accountId  String?         @map("account_id")
+  goalId     String?         @map("goal_id")
   note       String?
   occurredAt DateTime
   createdAt  DateTime        @default(now()) @map("created_at")
