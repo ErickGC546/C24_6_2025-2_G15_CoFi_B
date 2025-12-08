@@ -38,10 +38,23 @@ export async function PUT(
       },
       select: {
         amount: true,
+        type: true,
       },
     });
 
-    const newBalance = transactions.reduce((sum, t) => sum + t.amount.toNumber(), 0);
+    const newBalance = transactions.reduce((sum, t) => {
+      return t.type === "income" 
+        ? sum + t.amount.toNumber() 
+        : sum - t.amount.toNumber();
+    }, 0);
+
+    // ✅ ACTUALIZAR BALANCE EN LA CUENTA
+    if (updated.accountId) {
+      await prisma.account.update({
+        where: { id: updated.accountId },
+        data: { balance: newBalance },
+      });
+    }
 
     await prisma.auditLog.create({
       data: {
@@ -105,10 +118,23 @@ export async function DELETE(
       },
       select: {
         amount: true,
+        type: true,
       },
     });
 
-    const newBalance = transactions.reduce((sum, t) => sum + t.amount.toNumber(), 0);
+    const newBalance = transactions.reduce((sum, t) => {
+      return t.type === "income" 
+        ? sum + t.amount.toNumber() 
+        : sum - t.amount.toNumber();
+    }, 0);
+
+    // ✅ ACTUALIZAR BALANCE EN LA CUENTA
+    if (existing.accountId) {
+      await prisma.account.update({
+        where: { id: existing.accountId },
+        data: { balance: newBalance },
+      });
+    }
 
     await prisma.auditLog.create({
       data: {
