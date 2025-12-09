@@ -3,7 +3,6 @@ import { getAuth } from "firebase-admin/auth";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
 import "@/lib/firebaseAdmin";
-import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 /**
@@ -13,10 +12,6 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
  * 3. Extrae datos estructurados (monto, descripción, categoría, tipo)
  * 4. Guarda la transacción automáticamente
  */
-
-const client = new OpenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-});
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
@@ -206,20 +201,17 @@ Responde SOLO con un JSON válido, sin explicaciones:
       description: string;
       categoryName: string;
     };
-    // Guarda la respuesta cruda de la IA para poder reintentar el parseo si es necesario
-    let aiResponse = "{}";
 
     try {
-      const completion = await client.chat.completions.create({
-        model: "gemini-2.0-flash-exp",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: transcription },
-        ],
-        temperature: 0.2, // Baja temperatura para respuestas más consistentes
-        max_tokens: 200,
-      });
-      aiResponse = completion.choices[0]?.message?.content || "{}";
+      // ✅ USAR GEMINI en lugar de OpenAI
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      
+      const result = await model.generateContent([
+        systemPrompt,
+        `\nTexto a analizar: "${transcription}"`
+      ]);
+
+      const aiResponse = result.response.text().trim();
       console.log(`[Voice] Respuesta de IA: ${aiResponse}`);
 
       // Limpiar la respuesta (a veces la IA incluye markdown)
@@ -241,23 +233,27 @@ Responde SOLO con un JSON válido, sin explicaciones:
     } catch (parseError) {
       console.error("[Voice] Error al parsear respuesta de IA:", parseError);
 
-      // Intento de recuperación: pedirle al modelo que convierta su respuesta previa en JSON
+      // Intento de recuperación con Gemini
       try {
-        const recovery = await client.chat.completions.create({
-          model: "gemini-2.0-flash-exp",
-          messages: [
-            { role: "system", content: systemPrompt },
-            {
-              role: "user",
-              content: `La respuesta anterior del asistente fue:\n\n${aiResponse}\n\nPor favor, devuelve SOLO el JSON con la estructura solicitada. Si no puedes extraer monto o categoría, pon amount: 0 y categoryName: "".`,
-            },
-          ],
-          temperature: 0,
-          max_tokens: 200,
-        });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        
+        const recoveryResult = await model.generateContent([
+          `Del siguiente texto extraído por voz: "${transcription}"
+          
+Devuelve SOLO un JSON válido con esta estructura exacta (sin markdown, sin explicaciones):
+{
+  "type": "expense",
+  "amount": 50.00,
+  "description": "comida",
+  "categoryName": "Alimentación"
+}
 
-        const recoveryText = recovery.choices[0]?.message?.content || "";
+Si no puedes extraer algún dato, usa valores por defecto razonables.`
+        ]);
+
+        const recoveryText = recoveryResult.response.text().trim();
         console.log(`[Voice] Recuperación IA: ${recoveryText}`);
+        
         const jsonMatch2 = recoveryText.match(/\{[\s\S]*\}/);
         const jsonString2 = jsonMatch2 ? jsonMatch2[0] : recoveryText;
         parsedData = JSON.parse(jsonString2);
@@ -269,7 +265,6 @@ Responde SOLO con un JSON válido, sin explicaciones:
             {
               error: "No se pudo procesar la información después de intentar recuperarla.",
               transcription,
-              aiResponse,
               debug: parseError instanceof Error ? parseError.message : String(parseError),
             },
             { status: 400 }
@@ -286,7 +281,6 @@ Responde SOLO con un JSON válido, sin explicaciones:
           {
             error: "No se pudo procesar la información. Intenta ser más específico.",
             transcription,
-            aiResponse,
             debug: parseError instanceof Error ? parseError.message : String(parseError),
           },
           { status: 400 }
