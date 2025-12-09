@@ -101,9 +101,8 @@ export default function UserWelcome({ userName }: UserWelcomeProps) {
 
           <div className="mt-8">
             <a
-              href="https://drive.google.com/drive/u/2/folders/1U1kCOzs93iS89azrcBKjqPgEEK85D-g0"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="https://drive.google.com/uc?export=download&id=1U1kCOzs93iS89azrcBKjqPgEEK85D-g0"
+              download="CoFi.apk"
               className="inline-block bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-8 rounded-lg shadow-lg transition-all transform hover:scale-105"
             >
               📱 Descargar App Android
