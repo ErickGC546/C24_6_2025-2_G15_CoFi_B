@@ -101,7 +101,7 @@ export default function UserWelcome({ userName }: UserWelcomeProps) {
 
           <div className="mt-8">
             <a
-              href="/apk/CoFi.apk"
+              href="https://github.com/ErickGC546/C24_6_2025-2_G15_CoFi_B/releases/download/CoFi/CoFi.apk"
               download="CoFi.apk"
               className="inline-block bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-8 rounded-lg shadow-lg transition-all transform hover:scale-105"
             >
