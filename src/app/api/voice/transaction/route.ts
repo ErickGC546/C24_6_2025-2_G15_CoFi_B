@@ -16,7 +16,6 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const client = new OpenAI({
   apiKey: process.env.GEMINI_API_KEY,
-  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
 });
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
@@ -70,27 +69,34 @@ export async function POST(req: Request) {
     
     let transcription = "";
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-      // Determinar el MIME type correcto
+      // Determinar el MIME type correcto según documentación oficial de Gemini
+      // Soportados: WAV, MP3, AIFF, AAC, OGG Vorbis, FLAC
       let mimeType = audioFile.type;
       
       // Si no viene el tipo o es genérico, inferir del nombre
       if (!mimeType || mimeType === 'application/octet-stream') {
-        if (audioFile.name.endsWith('.webm')) {
-          mimeType = 'audio/webm';
-        } else if (audioFile.name.endsWith('.m4a')) {
-          mimeType = 'audio/m4a';
+        if (audioFile.name.endsWith('.wav')) {
+          mimeType = 'audio/wav'; // ✅ SOPORTADO
         } else if (audioFile.name.endsWith('.mp3')) {
-          mimeType = 'audio/mp3';
-        } else if (audioFile.name.endsWith('.wav')) {
-          mimeType = 'audio/wav';
+          mimeType = 'audio/mp3'; // ✅ SOPORTADO
+        } else if (audioFile.name.endsWith('.m4a') || audioFile.name.endsWith('.aac')) {
+          mimeType = 'audio/aac'; // ✅ SOPORTADO (AAC)
+        } else if (audioFile.name.endsWith('.flac')) {
+          mimeType = 'audio/flac'; // ✅ SOPORTADO
+        } else if (audioFile.name.endsWith('.ogg')) {
+          mimeType = 'audio/ogg'; // ✅ SOPORTADO (OGG Vorbis)
+        } else if (audioFile.name.endsWith('.aiff')) {
+          mimeType = 'audio/aiff'; // ✅ SOPORTADO
         } else {
-          mimeType = 'audio/webm'; // Default para navegadores modernos
+          mimeType = 'audio/wav'; // Default a WAV
         }
+      } else if (mimeType === 'audio/m4a' || mimeType === 'audio/mp4') {
+        mimeType = 'audio/aac'; // Normalizar m4a/mp4 a AAC
       }
 
-      console.log(`[Voice] Usando MIME type: ${mimeType}`);
+      console.log(`[Voice] Usando modelo: gemini-2.5-flash, MIME type: ${mimeType}, tamaño: ${audioFile.size} bytes`);
 
       const result = await model.generateContent([
         {
@@ -99,26 +105,56 @@ export async function POST(req: Request) {
             mimeType,
           },
         },
-        "Transcribe este audio al español. Devuelve SOLO el texto transcrito, sin explicaciones adicionales.",
+        `Transcribe este audio al español de Perú palabra por palabra.
+
+Reglas:
+1. Si el audio está vacío, en blanco o tiene ruido excesivo sin voz humana clara, responde SOLO "AUDIO_INVALIDO"
+2. Si detectas voz pero está muy distorsionada o inaudible, responde "AUDIO_INAUDIBLE"
+3. Si detectas voz clara, devuelve SOLO el texto transcrito exacto sin agregar puntos, comas ni explicaciones
+4. No inventes palabras si no las escuchas claramente
+5. Mantén el texto en minúsculas salvo nombres propios`,
       ]);
 
       transcription = result.response.text().trim();
-      console.log(`[Voice] ✅ Transcripción exitosa: "${transcription}"`);
+      console.log(`[Voice] ✅ Transcripción exitosa: "${transcription}" (${transcription.length} caracteres)`);
+
+      // Validación estricta de transcripción
+      const invalidTranscriptions = [
+        'AUDIO_INVALIDO', 
+        'AUDIO_INAUDIBLE', 
+        '.', 
+        'Eh.', 
+        'y', 
+        'eh',
+        'mm',
+        'uh',
+        'ah'
+      ];
+      
+      if (invalidTranscriptions.includes(transcription) || transcription.length < 5) {
+        console.error(`[Voice] ❌ Transcripción inválida o muy corta: "${transcription}"`);
+        return NextResponse.json(
+          { 
+            error: "No se detectó voz clara en el audio.\n\nConsejos:\n✓ Habla cerca del micrófono (5-10 cm)\n✓ Habla despacio y con claridad\n✓ Evita ruido de fondo\n✓ Mantén presionado el botón mientras hablas\n✓ Graba mínimo 2-3 segundos\n✓ Verifica los permisos de micrófono",
+            transcription,
+            debug: {
+              audioSize: audioFile.size,
+              mimeType,
+              model: "gemini-2.5-flash",
+              transcriptionLength: transcription.length
+            }
+          },
+          { status: 400 }
+        );
+      }
     } catch (transcriptionError) {
       console.error("[Voice] ❌ Error en transcripción:", transcriptionError);
       return NextResponse.json(
         { 
-          error: "Error al transcribir el audio. Intenta de nuevo.",
+          error: "Error al transcribir el audio. Verifica que el archivo sea válido.",
           details: transcriptionError instanceof Error ? transcriptionError.message : "Unknown error"
         },
         { status: 500 }
-      );
-    }
-
-    if (!transcription || transcription.trim().length === 0) {
-      return NextResponse.json(
-        { error: "No se pudo detectar audio. Habla más claro o graba de nuevo." },
-        { status: 400 }
       );
     }
 
@@ -180,7 +216,7 @@ Responde SOLO con un JSON válido, sin explicaciones:
           { role: "system", content: systemPrompt },
           { role: "user", content: transcription },
         ],
-        temperature: 0.3, // Baja temperatura para respuestas más consistentes
+        temperature: 0.2, // Baja temperatura para respuestas más consistentes
         max_tokens: 200,
       });
       aiResponse = completion.choices[0]?.message?.content || "{}";
@@ -350,7 +386,7 @@ Responde SOLO con un JSON válido, sin explicaciones:
         userId,
         provider: "gemini",
         requestType: "other",
-        model: "gemini-2.5-flash",
+        model: "gemini-2.5-flash", // Modelo usado para transcripción
         tokensIn,
         tokensOut,
         tokensTotal: tokensIn + tokensOut,
