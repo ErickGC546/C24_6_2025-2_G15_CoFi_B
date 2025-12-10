@@ -335,7 +335,12 @@ Si no puedes extraer algún dato, usa valores por defecto razonables.`
 
     // 💾 PASO 4: Crear la transacción (reutilizando lógica de /api/transactions)
     console.log(`[Voice] 💾 Creando transacción: ${parsedData.type}, monto: ${parsedData.amount}`);
-    
+
+    // Ajustar el monto: negativo para expense, positivo para income
+    const signedAmount = parsedData.type === "expense"
+      ? -Math.abs(parsedData.amount)
+      : Math.abs(parsedData.amount);
+
     // Buscar o crear cuenta principal
     let account = await prisma.account.findFirst({ where: { userId } });
     if (!account) {
@@ -345,12 +350,7 @@ Si no puedes extraer algún dato, usa valores por defecto razonables.`
     }
 
     // Calcular nuevo saldo
-    let newBalance = new Decimal(account.balance);
-    if (parsedData.type === "expense") {
-      newBalance = newBalance.minus(new Decimal(parsedData.amount));
-    } else if (parsedData.type === "income") {
-      newBalance = newBalance.plus(new Decimal(parsedData.amount));
-    }
+    let newBalance = new Decimal(account.balance).plus(signedAmount);
 
     // Crear transacción
     const transaction = await prisma.transaction.create({
@@ -358,7 +358,7 @@ Si no puedes extraer algún dato, usa valores por defecto razonables.`
         userId,
         accountId: account.id,
         type: parsedData.type,
-        amount: parsedData.amount,
+        amount: signedAmount, // monto negativo o positivo
         categoryId,
         note: parsedData.description,
         occurredAt: new Date(),
