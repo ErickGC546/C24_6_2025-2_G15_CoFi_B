@@ -34,18 +34,18 @@ export async function POST(req: Request) {
       });
     }
 
-    // Ajustar saldo según el tipo
+    // Ajustar el signo del monto y el saldo según el tipo
+    const finalAmount = type === "income" ? Math.abs(amount) : -Math.abs(amount);
     let newBalance = new Decimal(account.balance);
-    if (type === "expense") newBalance = newBalance.minus(new Decimal(amount));
-    else if (type === "income") newBalance = newBalance.plus(new Decimal(amount));
+    newBalance = newBalance.plus(new Decimal(finalAmount));
 
-    // Crear la transacción
+    // Crear la transacción con el monto ajustado
     const transaction = await prisma.transaction.create({
       data: {
         userId,
         accountId: account.id,
         type,
-        amount,
+        amount: finalAmount,
         categoryId,
         note,
         occurredAt: new Date(),

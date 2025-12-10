@@ -109,9 +109,8 @@ export async function DELETE(
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
-    await prisma.transaction.update({
+    await prisma.transaction.delete({
       where: { id },
-      data: { isDeleted: true },
     });
 
     // ✅ CALCULAR NUEVO BALANCE (sin la transacción eliminada)
@@ -126,11 +125,7 @@ export async function DELETE(
       },
     });
 
-    const newBalance = transactions.reduce((sum, t) => {
-      return t.type === "income" 
-        ? sum + t.amount.toNumber() 
-        : sum - t.amount.toNumber();
-    }, 0);
+    const newBalance = transactions.reduce((sum, t) => sum + t.amount.toNumber(), 0);
 
     // ✅ ACTUALIZAR BALANCE EN LA CUENTA
     if (existing.accountId) {
