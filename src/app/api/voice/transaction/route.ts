@@ -44,6 +44,9 @@ export async function POST(req: Request) {
     // 🎤 Obtener el archivo de audio del FormData
     const formData = await req.formData();
     const audioFile = formData.get("audio") as File | null;
+    // Nuevo: soporte parse-only. Frontend puede enviar parseOnly: "true" para solo parsear sin guardar
+    const parseOnlyRaw = formData.get("parseOnly");
+    const parseOnly = parseOnlyRaw === "true" || parseOnlyRaw === "1";
 
     if (!audioFile) {
       return NextResponse.json(
@@ -333,54 +336,24 @@ Si no puedes extraer algún dato, usa valores por defecto razonables.`
       console.log(`[Voice] ⚠️ No se especificó categoría en el audio`);
     }
 
-    // 💾 PASO 4: Crear la transacción (reutilizando lógica de /api/transactions)
-    console.log(`[Voice] 💾 Creando transacción: ${parsedData.type}, monto: ${parsedData.amount}`);
+    // 💾 PASO 4: Preparar creación o solo parseo
+    console.log(`[Voice] Procesando transacción: ${parsedData.type}, monto: ${parsedData.amount}`);
 
     // Ajustar el monto: negativo para expense, positivo para income
     const signedAmount = parsedData.type === "expense"
       ? -Math.abs(parsedData.amount)
       : Math.abs(parsedData.amount);
 
-    // Buscar o crear cuenta principal
-    let account = await prisma.account.findFirst({ where: { userId } });
-    if (!account) {
-      account = await prisma.account.create({
-        data: { userId, name: "Cuenta principal", balance: 0, currency: "PEN" },
-      });
-    }
-
-    // Calcular nuevo saldo
-    let newBalance = new Decimal(account.balance).plus(signedAmount);
-
-    // Crear transacción
-    const transaction = await prisma.transaction.create({
-      data: {
-        userId,
-        accountId: account.id,
-        type: parsedData.type,
-        amount: signedAmount, // monto negativo o positivo
-        categoryId,
-        note: parsedData.description,
-        occurredAt: new Date(),
-      },
-    });
-
-    // Actualizar saldo de la cuenta
-    await prisma.account.update({
-      where: { id: account.id },
-      data: { balance: newBalance },
-    });
-
-    // 📊 PASO 5: Registrar uso de IA y descontar créditos
+    // 📊 Registrar uso de IA y descontar créditos (se aplica tanto a parse-only como a creación real)
     const tokensIn = Math.ceil(transcription.length / 4); // aprox 4 chars per token
     const tokensOut = Math.ceil(JSON.stringify(parsedData).length / 4);
-    
+
     await prisma.aiUsage.create({
       data: {
         userId,
         provider: "gemini",
         requestType: "other",
-        model: "gemini-2.5-flash", // Modelo usado para transcripción
+        model: "gemini-2.5-flash",
         tokensIn,
         tokensOut,
         tokensTotal: tokensIn + tokensOut,
@@ -395,6 +368,58 @@ Si no puedes extraer algún dato, usa valores por defecto razonables.`
       where: { id: userId },
       data: { aiCreditsRemaining: user.aiCreditsRemaining - creditsNeeded },
     });
+
+    // Si solo pedimos parse (no guardar), devolver el resultado parsed sin persistir
+    if (parseOnly) {
+      await prisma.auditLog.create({
+        data: {
+          actorId: userId,
+          action: `Parse-only: transacción por voz (no guardada)`,
+          detail: {
+            transcription,
+            parsed: parsedData,
+            signedAmount,
+            categoryId,
+          },
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        parseOnly: true,
+        message: "Parse realizado correctamente. No se guardó la transacción.",
+        transcription,
+        parsed: { ...parsedData, signedAmount },
+        creditsRemaining: user.aiCreditsRemaining - creditsNeeded,
+      });
+    }
+
+    // Continúa con la creación real si parseOnly === false
+
+    // Buscar o crear cuenta principal
+    let account = await prisma.account.findFirst({ where: { userId } });
+    if (!account) {
+      account = await prisma.account.create({
+        data: { userId, name: "Cuenta principal", balance: 0, currency: "PEN" },
+      });
+    }
+
+    // Calcular nuevo saldo y crear la transacción
+    let newBalance = new Decimal(account.balance).plus(signedAmount);
+
+    const transaction = await prisma.transaction.create({
+      data: {
+        userId,
+        accountId: account.id,
+        type: parsedData.type,
+        amount: signedAmount,
+        categoryId,
+        note: parsedData.description,
+        occurredAt: new Date(),
+      },
+    });
+
+    await prisma.account.update({ where: { id: account.id }, data: { balance: newBalance } });
 
     // Crear log de auditoría
     await prisma.auditLog.create({
