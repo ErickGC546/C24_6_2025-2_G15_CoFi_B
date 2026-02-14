@@ -5,11 +5,11 @@ import "@/lib/firebaseAdmin";
 import OpenAI from "openai";
 
 // Minimal, easy-to-read handler that: verifies Firebase token, validates messages,
-// calls Gemini via the `openai` SDK, and saves aiUsage + credit transaction.
+// calls Groq via the `openai` SDK, and saves aiUsage + credit transaction.
 
 const client = new OpenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+  apiKey: process.env.GROQ_API_KEY,
+  baseURL: "https://api.groq.com/openai/v1",
 });
 
 function isRecord(x: unknown): x is Record<string, unknown> {
@@ -36,9 +36,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Falta el/los mensaje(s) del usuario" }, { status: 400 });
     }
 
-    if (!process.env.GEMINI_API_KEY) {
-      console.error("[AI] missing GEMINI_API_KEY");
-      return NextResponse.json({ error: "Falta la configuración del proveedor de IA (GEMINI_API_KEY)." }, { status: 500 });
+    if (!process.env.GROQ_API_KEY) {
+      console.error("[AI] missing GROQ_API_KEY");
+      return NextResponse.json({ error: "Falta la configuración del proveedor de IA (GROQ_API_KEY)." }, { status: 500 });
     }
 
     // Verify user and credits
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No tienes créditos de IA suficientes" }, { status: 402 });
     }
 
-    const modelName = "gemini-2.5-pro";
+    const modelName = "llama-3.3-70b-versatile";
 
     // Call provider for each message (simple, no retries)
     const results: Array<{ input: string; outputText: string | null; raw: unknown }> = [];
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
         await tx.aiUsage.create({
           data: {
             userId,
-            provider: "gemini",
+            provider: "groq",
             requestType: "advice",
             model: modelName,
             tokensIn: 0,
@@ -129,7 +129,7 @@ export async function POST(req: Request) {
           change: -creditsNeeded,
           balanceAfter,
           reason: creditsNeeded > 1 ? "ai_request_batch" : "ai_request",
-          source: "gemini",
+          source: "groq",
         },
       });
 

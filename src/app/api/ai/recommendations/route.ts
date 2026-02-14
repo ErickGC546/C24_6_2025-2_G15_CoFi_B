@@ -5,11 +5,11 @@ import "@/lib/firebaseAdmin";
 import OpenAI from "openai";
 
 const client = new OpenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+  apiKey: process.env.GROQ_API_KEY,
+  baseURL: "https://api.groq.com/openai/v1",
 });
 
-const MODEL_NAME = "gemini-2.5-pro";
+const MODEL_NAME = "llama-3.3-70b-versatile";
 
 // 🛡️ Map para evitar duplicados - almacena promesas en proceso
 const processingRequests = new Map<string, Promise<any>>();
@@ -369,8 +369,8 @@ Pregunta del usuario: "${context.userQuestion}"
 
 Analiza los datos y proporciona una recomendación personalizada en formato JSON.`;
 
-          if (!process.env.GEMINI_API_KEY) {
-            console.error("[AI] missing GEMINI_API_KEY");
+          if (!process.env.GROQ_API_KEY) {
+            console.error("[AI] missing GROQ_API_KEY");
             return {
               recSummary: "Servicio de IA no configurado",
               recFull: "No se pudo generar recomendación personalizada",
@@ -389,7 +389,7 @@ Analiza los datos y proporciona una recomendación personalizada en formato JSON
             });
 
             const text = res.choices?.[0]?.message?.content;
-            if (!text) throw new Error("No response from Gemini");
+            if (!text) throw new Error("No response from Groq");
 
             // Intentar parsear JSON de la respuesta
             try {
@@ -418,7 +418,7 @@ Analiza los datos y proporciona una recomendación personalizada en formato JSON
               };
             }
           } catch (err) {
-            console.error("Error al llamar Gemini:", err);
+            console.error("Error al llamar Groq:", err);
             // Fallback: plantilla mejorada con análisis completo de los datos del usuario
             const { totals, topExpenseCategories, savingsGoals, patterns } = context;
             

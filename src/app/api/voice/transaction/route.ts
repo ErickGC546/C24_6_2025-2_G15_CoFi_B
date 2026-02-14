@@ -3,17 +3,19 @@ import { getAuth } from "firebase-admin/auth";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
 import "@/lib/firebaseAdmin";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import OpenAI from "openai";
 
 /**
  * Endpoint para procesar transacciones por voz
  * 1. Recibe audio del micrófono
- * 2. Transcribe el audio usando Gemini
+ * 2. Transcribe el audio usando Groq Whisper
  * 3. Extrae datos estructurados (monto, descripción, categoría, tipo)
  * 4. Guarda la transacción automáticamente
  */
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const client = new OpenAI({
+  apiKey: process.env.GROQ_API_KEY,
+  baseURL: "https://api.groq.com/openai/v1",
+});
 
 export async function POST(req: Request) {
   try {
@@ -41,6 +43,14 @@ export async function POST(req: Request) {
       );
     }
 
+    if (!process.env.GROQ_API_KEY) {
+      console.error("[Voice] Falta GROQ_API_KEY");
+      return NextResponse.json(
+        { error: "El servicio de IA no está configurado" },
+        { status: 500 }
+      );
+    }
+
     // 🎤 Obtener el archivo de audio del FormData
     const formData = await req.formData();
     const audioFile = formData.get("audio") as File | null;
@@ -55,102 +65,64 @@ export async function POST(req: Request) {
       );
     }
 
-    // Convertir el archivo a buffer para enviarlo a Gemini
+    // Convertir el archivo a buffer (Groq acepta File directamente, pero garantizamos consistencia)
     const arrayBuffer = await audioFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    const normalizedMimeType = audioFile.type || "audio/webm";
+    const groqFile = new File([buffer], audioFile.name || "audio.m4a", { type: normalizedMimeType });
 
-    // 📝 Log para debug: ver tipo de archivo recibido
-    console.log(`[Voice] Archivo recibido: ${audioFile.name}, tipo: ${audioFile.type}, tamaño: ${audioFile.size} bytes`);
+    console.log(`[Voice] Archivo recibido: ${audioFile.name}, tipo: ${normalizedMimeType}, tamaño: ${audioFile.size} bytes`);
 
-    // 🗣️ PASO 1: Transcribir el audio usando Gemini nativo
-    console.log(`[Voice] Transcribiendo audio con Gemini para usuario ${userId}...`);
+    // 🗣️ PASO 1: Transcribir el audio usando Groq Whisper
+    console.log(`[Voice] Transcribiendo audio con Groq (whisper-large-v3-turbo) para usuario ${userId}...`);
     
     let transcription = "";
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const transcriptionResult = await client.audio.transcriptions.create({
+        file: groqFile,
+        model: "whisper-large-v3-turbo",
+        language: "es",
+        temperature: 0,
+      });
 
-      // Determinar el MIME type correcto según documentación oficial de Gemini
-      // Soportados: WAV, MP3, AIFF, AAC, OGG Vorbis, FLAC
-      let mimeType = audioFile.type;
-      
-      // Si no viene el tipo o es genérico, inferir del nombre
-      if (!mimeType || mimeType === 'application/octet-stream') {
-        if (audioFile.name.endsWith('.wav')) {
-          mimeType = 'audio/wav'; // ✅ SOPORTADO
-        } else if (audioFile.name.endsWith('.mp3')) {
-          mimeType = 'audio/mp3'; // ✅ SOPORTADO
-        } else if (audioFile.name.endsWith('.m4a') || audioFile.name.endsWith('.aac')) {
-          mimeType = 'audio/aac'; // ✅ SOPORTADO (AAC)
-        } else if (audioFile.name.endsWith('.flac')) {
-          mimeType = 'audio/flac'; // ✅ SOPORTADO
-        } else if (audioFile.name.endsWith('.ogg')) {
-          mimeType = 'audio/ogg'; // ✅ SOPORTADO (OGG Vorbis)
-        } else if (audioFile.name.endsWith('.aiff')) {
-          mimeType = 'audio/aiff'; // ✅ SOPORTADO
-        } else {
-          mimeType = 'audio/wav'; // Default a WAV
-        }
-      } else if (mimeType === 'audio/m4a' || mimeType === 'audio/mp4') {
-        mimeType = 'audio/aac'; // Normalizar m4a/mp4 a AAC
-      }
+      transcription = transcriptionResult.text?.trim() ?? "";
+      console.log(`[Voice] ✅ Transcripción Groq: "${transcription}" (${transcription.length} caracteres)`);
 
-      console.log(`[Voice] Usando modelo: gemini-2.5-flash, MIME type: ${mimeType}, tamaño: ${audioFile.size} bytes`);
-
-      const result = await model.generateContent([
-        {
-          inlineData: {
-            data: buffer.toString("base64"),
-            mimeType,
-          },
-        },
-        `Transcribe este audio al español de Perú palabra por palabra.
-
-Reglas:
-1. Si el audio está vacío, en blanco o tiene ruido excesivo sin voz humana clara, responde SOLO "AUDIO_INVALIDO"
-2. Si detectas voz pero está muy distorsionada o inaudible, responde "AUDIO_INAUDIBLE"
-3. Si detectas voz clara, devuelve SOLO el texto transcrito exacto sin agregar puntos, comas ni explicaciones
-4. No inventes palabras si no las escuchas claramente
-5. Mantén el texto en minúsculas salvo nombres propios`,
-      ]);
-
-      transcription = result.response.text().trim();
-      console.log(`[Voice] ✅ Transcripción exitosa: "${transcription}" (${transcription.length} caracteres)`);
-
-      // Validación estricta de transcripción
       const invalidTranscriptions = [
-        'AUDIO_INVALIDO', 
-        'AUDIO_INAUDIBLE', 
-        '.', 
-        'Eh.', 
-        'y', 
-        'eh',
-        'mm',
-        'uh',
-        'ah'
+        "",
+        "AUDIO_INVALIDO",
+        "AUDIO_INAUDIBLE",
+        ".",
+        "Eh.",
+        "y",
+        "eh",
+        "mm",
+        "uh",
+        "ah",
       ];
-      
+
       if (invalidTranscriptions.includes(transcription) || transcription.length < 5) {
         console.error(`[Voice] ❌ Transcripción inválida o muy corta: "${transcription}"`);
         return NextResponse.json(
-          { 
+          {
             error: "No se detectó voz clara en el audio.\n\nConsejos:\n✓ Habla cerca del micrófono (5-10 cm)\n✓ Habla despacio y con claridad\n✓ Evita ruido de fondo\n✓ Mantén presionado el botón mientras hablas\n✓ Graba mínimo 2-3 segundos\n✓ Verifica los permisos de micrófono",
             transcription,
             debug: {
               audioSize: audioFile.size,
-              mimeType,
-              model: "gemini-2.5-flash",
-              transcriptionLength: transcription.length
-            }
+              mimeType: normalizedMimeType,
+              model: "whisper-large-v3-turbo",
+              transcriptionLength: transcription.length,
+            },
           },
           { status: 400 }
         );
       }
     } catch (transcriptionError) {
-      console.error("[Voice] ❌ Error en transcripción:", transcriptionError);
+      console.error("[Voice] ❌ Error en transcripción Groq:", transcriptionError);
       return NextResponse.json(
-        { 
+        {
           error: "Error al transcribir el audio. Verifica que el archivo sea válido.",
-          details: transcriptionError instanceof Error ? transcriptionError.message : "Unknown error"
+          details: transcriptionError instanceof Error ? transcriptionError.message : "Unknown error",
         },
         { status: 500 }
       );
@@ -206,42 +178,48 @@ Responde SOLO con un JSON válido, sin explicaciones:
     };
 
     try {
-      // ✅ USAR GEMINI en lugar de OpenAI
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-      
-      const result = await model.generateContent([
-        systemPrompt,
-        `\nTexto a analizar: "${transcription}"`
-      ]);
+      const parseResponse = await client.chat.completions.create({
+        model: "llama-3.3-70b-versatile",
+        temperature: 0.2,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `\nTexto a analizar: "${transcription}"` },
+        ],
+      });
 
-      const aiResponse = result.response.text().trim();
-      console.log(`[Voice] Respuesta de IA: ${aiResponse}`);
+      const aiResponse = parseResponse.choices?.[0]?.message?.content?.trim();
+      if (!aiResponse) {
+        throw new Error("Groq no devolvió contenido para el parseo");
+      }
+      console.log(`[Voice] Respuesta de IA (Groq): ${aiResponse}`);
 
-      // Limpiar la respuesta (a veces la IA incluye markdown)
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
       const jsonString = jsonMatch ? jsonMatch[0] : aiResponse;
 
       parsedData = JSON.parse(jsonString);
 
-      // Validaciones básicas
       if (!parsedData.type || !parsedData.amount || parsedData.amount <= 0) {
         throw new Error("Datos incompletos o inválidos");
       }
 
-      // Normalizar type
       if (!["expense", "income"].includes(parsedData.type)) {
-        parsedData.type = "expense"; // default
+        parsedData.type = "expense";
       }
-
     } catch (parseError) {
-      console.error("[Voice] Error al parsear respuesta de IA:", parseError);
+      console.error("[Voice] Error al parsear respuesta de Groq:", parseError);
 
-      // Intento de recuperación con Gemini
       try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-        
-        const recoveryResult = await model.generateContent([
-          `Del siguiente texto extraído por voz: "${transcription}"
+        const recoveryResponse = await client.chat.completions.create({
+          model: "llama-3.3-70b-versatile",
+          temperature: 0,
+          messages: [
+            {
+              role: "system",
+              content: `Devuelve SOLO un JSON válido con la estructura solicitada. Si falta información, usa valores por defecto razonables dentro del mismo formato.`,
+            },
+            {
+              role: "user",
+              content: `Del siguiente texto extraído por voz: "${transcription}"
           
 Devuelve SOLO un JSON válido con esta estructura exacta (sin markdown, sin explicaciones):
 {
@@ -249,19 +227,18 @@ Devuelve SOLO un JSON válido con esta estructura exacta (sin markdown, sin expl
   "amount": 50.00,
   "description": "comida",
   "categoryName": "Alimentación"
-}
+}`,
+            },
+          ],
+        });
 
-Si no puedes extraer algún dato, usa valores por defecto razonables.`
-        ]);
-
-        const recoveryText = recoveryResult.response.text().trim();
-        console.log(`[Voice] Recuperación IA: ${recoveryText}`);
+        const recoveryText = recoveryResponse.choices?.[0]?.message?.content?.trim() ?? "";
+        console.log(`[Voice] Recuperación IA (Groq): ${recoveryText}`);
         
         const jsonMatch2 = recoveryText.match(/\{[\s\S]*\}/);
         const jsonString2 = jsonMatch2 ? jsonMatch2[0] : recoveryText;
         parsedData = JSON.parse(jsonString2);
 
-        // Validaciones básicas de nuevo
         if (!parsedData.type || !parsedData.amount || parsedData.amount <= 0) {
           console.error("[Voice] Recuperación fallida: datos inválidos", parsedData);
           return NextResponse.json(
@@ -277,7 +254,6 @@ Si no puedes extraer algún dato, usa valores por defecto razonables.`
         if (!["expense", "income"].includes(parsedData.type)) {
           parsedData.type = "expense";
         }
-
       } catch (recoveryError) {
         console.error("[Voice] Fallback parse failed:", recoveryError);
         return NextResponse.json(
@@ -351,9 +327,9 @@ Si no puedes extraer algún dato, usa valores por defecto razonables.`
     await prisma.aiUsage.create({
       data: {
         userId,
-        provider: "gemini",
+        provider: "groq",
         requestType: "other",
-        model: "gemini-2.5-flash",
+        model: "whisper-large-v3-turbo",
         tokensIn,
         tokensOut,
         tokensTotal: tokensIn + tokensOut,
