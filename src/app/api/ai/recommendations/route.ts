@@ -358,7 +358,7 @@ Reglas:
 6. **Usa tendencias**: compara meses anteriores, detecta si está mejorando o empeorando su situación financiera
 7. **Motiva y educa**: explica el impacto de cambios pequeños en el ahorro a largo plazo.
 8. **Responde en formato JSON** con estas propiedades:
-   - recSummary (string): resumen corto de 1-2 líneas con la recomendación principal
+   - recSummary (string): resumen de dos párrafos breves 
    - recFull (string): explicación detallada con datos específicos del usuario, análisis de tendencias, estado de metas, y pasos de acción concretos
    - score (number): nivel de urgencia/importancia de 0 a 1 (usa 0.8-1.0 si hay presupuestos excedidos o metas en riesgo)`;
 
