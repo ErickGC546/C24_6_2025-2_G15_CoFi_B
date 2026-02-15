@@ -54,7 +54,7 @@ export default function Navbar() {
               </span>
               <button
                 onClick={handleLogout}
-                className="w-full rounded bg-green-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-600 sm:w-auto"
+                className="inline-flex w-full cursor-pointer justify-center rounded border border-green-500 px-4 py-2 text-sm font-semibold text-green-400 transition hover:border-green-400 hover:text-green-300 sm:w-auto"
               >
                 Cerrar sesión
               </button>

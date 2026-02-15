@@ -21,7 +21,7 @@ export default function LoginPage() {
             headers: { Authorization: `Bearer ${token}` }
           });
           const data = await res.json();
-          
+
           if (data.role === 'usuario') {
             setShowAppDownload(true);
           }
@@ -92,53 +92,84 @@ export default function LoginPage() {
   };
   
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="bg-green-100 inline-block p-4 rounded-full mb-3 shadow">
-            <div className="text-3xl font-bold text-green-600 tracking-wide">COFI</div>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-800">Bienvenido</h1>
-          <p className="text-sm text-gray-400 mt-1">
-            Maneja tus finanzas de forma consciente y colaborativa
-          </p>
-        </div>
+    <div className="relative min-h-screen overflow-hidden bg-[#030c06] text-white">
+      <div
+        className="pointer-events-none absolute inset-0 opacity-60"
+        style={{
+          background:
+            'radial-gradient(circle at 10% 20%, rgba(34,197,94,0.3), transparent 50%), radial-gradient(circle at 80% 0%, rgba(255,255,255,0.08), transparent 45%)'
+        }}
+      />
 
-        {/* Botón de descarga - solo visible para usuarios regulares */}
-        {showAppDownload && (
-          <div className="mb-6">
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 lg:flex-row lg:items-stretch">
+        <section className="flex flex-1 flex-col justify-between gap-8 rounded-3xl bg-[#08150f]/70 p-8 text-center backdrop-blur lg:text-left">
+          <div className="space-y-6">
+            <div className="inline-flex items-center justify-center gap-2 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-4 py-1 text-xs font-semibold tracking-[0.35em] text-emerald-300 lg:justify-start">
+              COFI
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+            </div>
+            <div className="space-y-4">
+              <h1 className="text-3xl font-semibold leading-tight text-white sm:text-4xl" style={{ fontFamily: 'Space Grotesk, Sora, sans-serif' }}>
+                Ingresa y sincroniza tu vida financiera en un solo panel.
+              </h1>
+              <p className="text-base text-emerald-100/80">
+                COFI combina registro por voz, metas compartidas e inteligencia predictiva hecha para comunidades Tecsup. Mantén el mismo lenguaje visual de la app desde el primer acceso.
+              </p>
+            </div>
+            <ul className="space-y-3 text-sm text-emerald-100/80">
+              <li className="flex items-center gap-3">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />Alertas inteligentes cuando un gasto se dispara.
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />Equipos colaborativos con reportes listos para compartir.
+              </li>
+              <li className="flex items-center gap-3">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />Seguridad respaldada por Firebase y cifrado extremo.
+              </li>
+            </ul>
+          </div>
+
+          {showAppDownload ? (
             <button
               onClick={handleDownloadApp}
-              className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white p-4 rounded-xl font-bold text-lg shadow-lg hover:from-green-600 hover:to-green-700 transition flex items-center justify-center gap-3"
+              className="inline-flex w-full items-center justify-center rounded-2xl bg-emerald-500 px-6 py-4 text-base font-semibold text-[#030c06] shadow-lg shadow-emerald-500/30 transition hover:-translate-y-0.5"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-              📱 Descarga la App aquí
+              📱 Descargar COFI para Android
             </button>
-          </div>
-        )}
+          ) : (
+            <p className="text-xs text-emerald-100/70">
+              Una vez que confirmemos tu rol de usuario, podrás descargar la app móvil directamente desde aquí.
+            </p>
+          )}
+        </section>
 
-        <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
+        <section className="flex-1 rounded-3xl bg-white/95 p-6 text-[#0c1d14] shadow-[0_25px_80px_rgba(0,0,0,0.35)] sm:p-8">
+          <div className="mb-4 text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.4em] text-emerald-600">Acceso</p>
+            <h2 className="text-2xl font-semibold text-[#0c1d14]" style={{ fontFamily: 'Space Grotesk, Sora, sans-serif' }}>
+              Inicia sesión con tu cuenta Tecsup
+            </h2>
+          </div>
+
           <form onSubmit={handleLogin} className="space-y-5">
             <div className="space-y-2">
-              <label htmlFor="email" className="block text-sm font-semibold text-gray-800">Correo electrónico</label>
+              <label htmlFor="email" className="block text-sm font-semibold text-[#0a1a11]">Correo electrónico</label>
               <input
                 id="email"
                 type="email"
-                placeholder="tu@ejemplo.com"
+                placeholder="tu@tecsup.edu.pe"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full border border-gray-300 p-2 rounded focus:outline-none focus:ring-2 focus:ring-green-400 bg-white placeholder:text-gray-400"
+                className="w-full rounded-2xl border border-emerald-100 bg-white/80 p-3 text-sm text-[#0c1d14] placeholder:text-emerald-300 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
                 required
               />
             </div>
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label htmlFor="password" className="block text-sm font-semibold text-gray-800">Contraseña</label>
+              <div className="flex items-center justify-between text-xs font-semibold text-[#0a1a11]">
+                <label htmlFor="password">Contraseña</label>
                 <button
                   type="button"
-                  className="text-xs text-green-600 hover:underline px-0 bg-transparent"
+                  className="text-emerald-600 transition hover:text-emerald-500"
                   tabIndex={-1}
                 >
                   ¿Olvidaste tu contraseña?
@@ -150,36 +181,36 @@ export default function LoginPage() {
                 placeholder="Tu contraseña"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full border border-gray-300 p-2 rounded focus:outline-none focus:ring-2 focus:ring-green-400 bg-white placeholder:text-gray-400"
+                className="w-full rounded-2xl border border-emerald-100 bg-white/80 p-3 text-sm text-[#0c1d14] placeholder:text-emerald-300 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
                 required
               />
             </div>
             <button
               type="submit"
-              className="w-full bg-green-500 text-white p-2 rounded font-semibold hover:bg-green-600 transition"
+              className="w-full rounded-2xl bg-[#082214] px-6 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5"
             >
               Iniciar sesión
             </button>
             {error && (
-              <p className="text-red-600 text-sm text-center">{error}</p>
+              <p className="text-center text-sm text-red-500">{error}</p>
             )}
           </form>
 
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-gray-200" />
+              <span className="w-full border-t border-emerald-50" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-white px-2 text-gray-400">o</span>
+              <span className="bg-white px-2 text-emerald-400">o</span>
             </div>
           </div>
 
           <button
             onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center bg-white border border-gray-300 rounded p-2 font-semibold shadow-sm hover:bg-green-50 transition"
+            className="flex w-full items-center justify-center gap-3 rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-sm font-semibold text-[#0c1d14] shadow-sm transition hover:border-emerald-300 hover:-translate-y-0.5"
             type="button"
           >
-            <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+            <svg className="h-5 w-5" viewBox="0 0 24 24">
               <path
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                 fill="#4285F4"
@@ -199,7 +230,7 @@ export default function LoginPage() {
             </svg>
             Ingresa con tu correo de Tecsup
           </button>
-        </div>
+        </section>
       </div>
     </div>
   );

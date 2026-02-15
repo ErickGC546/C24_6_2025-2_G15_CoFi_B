@@ -206,6 +206,9 @@ export default function UserWelcome({ userName }: UserWelcomeProps) {
             </ul>
           </div>
         </section>
+        <footer className="flex flex-wrap items-center justify-center border-t border-white/10 pt-6 text-center text-sm text-emerald-100/70">
+          <span className="w-full">© {new Date().getFullYear()} COFI · Diseñado por ErickGC546</span>
+        </footer>
       </div>
     </div>
   );

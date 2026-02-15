@@ -107,12 +107,6 @@ export default function AutoCarousel() {
               <div className="flex flex-wrap justify-center gap-4 md:justify-start">
                 <a
                   href="/login"
-                  className="rounded-xl bg-emerald-500 px-6 py-3 text-center text-base font-semibold text-[#030c06] shadow-lg shadow-emerald-500/30 transition hover:-translate-y-0.5 hover:bg-emerald-400"
-                >
-                  Crear cuenta gratis
-                </a>
-                <a
-                  href="#tour"
                   className="rounded-xl border border-white/30 px-6 py-3 text-base font-semibold text-white transition hover:border-emerald-400 hover:text-emerald-200"
                 >
                   Ver cómo funciona
@@ -121,7 +115,7 @@ export default function AutoCarousel() {
               <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-emerald-100/70 md:justify-start">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">⭐️⭐️⭐️⭐️⭐️</span>
-                  <span>4.9 en Android</span>
+                  <span>en Android</span>
                 </div>
                 <div className="h-4 w-px bg-white/20" />
                 <span>Sin tarjetas vinculadas · Cancelas cuando quieras</span>
@@ -216,16 +210,8 @@ export default function AutoCarousel() {
             </div>
           </section>
 
-          <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-6 text-center text-sm text-emerald-100/70">
-            <span className="w-full sm:w-auto">© {new Date().getFullYear()} COFI · Diseñado en Latinoamérica</span>
-            <div className="flex w-full flex-wrap justify-center gap-4 sm:w-auto">
-              <a href="/login" className="hover:text-white">
-                Centro de ayuda
-              </a>
-              <a href="mailto:hola@cofi.app" className="hover:text-white">
-                hola@cofi.app
-              </a>
-            </div>
+          <footer className="flex flex-wrap items-center justify-center border-t border-white/10 pt-6 text-center text-sm text-emerald-100/70">
+            <span className="w-full">© {new Date().getFullYear()} COFI · Diseñado por ErickGC546</span>
           </footer>
         </div>
       </div>
