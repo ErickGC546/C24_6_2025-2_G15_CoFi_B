@@ -53,8 +53,8 @@ const benefits = [
     description: 'Presupuestos compartidos, recordatorios y liquidaciones automáticas para grupos.'
   },
   {
-    title: 'Seguridad bancaria',
-    description: 'Cifrado extremo a extremo y respaldo en Firebase para mantener tus datos protegidos.'
+    title: 'Seguridad al usuario',
+    description: 'Cifrado y respaldo en Firebase para mantener tus datos protegidos.'
   }
 ];
 
@@ -117,8 +117,6 @@ export default function AutoCarousel() {
                   <span className="text-lg">⭐️⭐️⭐️⭐️⭐️</span>
                   <span>en Android</span>
                 </div>
-                <div className="h-4 w-px bg-white/20" />
-                <span>Sin tarjetas vinculadas · Cancelas cuando quieras</span>
               </div>
             </div>
 

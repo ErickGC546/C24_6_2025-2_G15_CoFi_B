@@ -85,11 +85,6 @@ export default function LoginPage() {
       setError('Error al iniciar sesión con Google');
     }
   };
-
-  const handleDownloadApp = () => {
-    // Reemplaza con la URL real de tu app
-    window.open('https://drive.google.com/drive/u/2/folders/1U1kCOzs93iS89azrcBKjqPgEEK85D-g0', '_blank');
-  };
   
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#030c06] text-white">
@@ -128,19 +123,6 @@ export default function LoginPage() {
               </li>
             </ul>
           </div>
-
-          {showAppDownload ? (
-            <button
-              onClick={handleDownloadApp}
-              className="inline-flex w-full items-center justify-center rounded-2xl bg-emerald-500 px-6 py-4 text-base font-semibold text-[#030c06] shadow-lg shadow-emerald-500/30 transition hover:-translate-y-0.5"
-            >
-              📱 Descargar COFI para Android
-            </button>
-          ) : (
-            <p className="text-xs text-emerald-100/70">
-              Una vez que confirmemos tu rol de usuario, podrás descargar la app móvil directamente desde aquí.
-            </p>
-          )}
         </section>
 
         <section className="flex-1 rounded-3xl bg-white/95 p-6 text-[#0c1d14] shadow-[0_25px_80px_rgba(0,0,0,0.35)] sm:p-8">
@@ -157,7 +139,7 @@ export default function LoginPage() {
               <input
                 id="email"
                 type="email"
-                placeholder="tu@tecsup.edu.pe"
+                placeholder="ejemplo@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-2xl border border-emerald-100 bg-white/80 p-3 text-sm text-[#0c1d14] placeholder:text-emerald-300 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"

@@ -141,13 +141,13 @@ El usuario dirá una frase en español y tu trabajo es extraer:
 Categorías válidas para GASTOS (expense):
 - Alimentación (comida, almuerzo, desayuno, cena, restaurante, comida rápida)
 - Transporte (taxi, uber, bus, pasaje, movilidad, gasolina, combustible)
-- Servicios (internet, celular, recarga, apps, netflix, suscripciones)
+- Servicios (internet, recarga, apps, netflix, suscripciones, servicios, luz, agua, gas)
 - Salud (doctor, farmacia, medicina, hospital, consulta médica)
 - Entretenimiento (cine, ocio, juegos, salida, diversión, fiesta)
 - Educación (cursos, libros, universidad, colegio, estudios)
 - Ropa (ropa, zapatos, vestimenta, ropa deportiva, accesorios)
 - Metas (ahorro, meta, inversión)
-- tecnologia (tecnología, laptop, celular, gadgets, electrónicos)
+- Tecnologia (tecnología, laptop, celular, gadgets, electrónicos)
 
 Categorías válidas para INGRESOS (income):
 - Trabajo (sueldo, salario, nómina, pago de trabajo)
@@ -161,6 +161,7 @@ Reglas importantes:
 5. Si menciona "soles" o "S/" es moneda peruana (PEN)
 6. Usa EXACTAMENTE los nombres de categorías de la lista (respeta mayúsculas/minúsculas)
 7. Si no estás seguro de la categoría, NO inventes, usa el nombre más cercano de la lista
+8. La descripción debe ser exactamente lo que el usuario dijo que hizo (ej. comida) y la categoría debe ser el nombre técnico correspondiente (ej. Alimentación)
 
 Responde SOLO con un JSON válido, sin explicaciones:
 {
@@ -320,32 +321,7 @@ Devuelve SOLO un JSON válido con esta estructura exacta (sin markdown, sin expl
       ? -Math.abs(parsedData.amount)
       : Math.abs(parsedData.amount);
 
-    // 📊 Registrar uso de IA y descontar créditos (se aplica tanto a parse-only como a creación real)
-    const tokensIn = Math.ceil(transcription.length / 4); // aprox 4 chars per token
-    const tokensOut = Math.ceil(JSON.stringify(parsedData).length / 4);
-
-    await prisma.aiUsage.create({
-      data: {
-        userId,
-        provider: "groq",
-        requestType: "other",
-        model: "whisper-large-v3-turbo",
-        tokensIn,
-        tokensOut,
-        tokensTotal: tokensIn + tokensOut,
-        creditsCharged: creditsNeeded,
-        costEstimateUsd: 0.01 * creditsNeeded,
-        inputJson: { transcription },
-        outputJson: parsedData,
-      },
-    });
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: { aiCreditsRemaining: user.aiCreditsRemaining - creditsNeeded },
-    });
-
-    // Si solo pedimos parse (no guardar), devolver el resultado parsed sin persistir
+    // Si solo pedimos parse (no guardar), devolver el resultado parsed sin persistir ni descontar créditos
     if (parseOnly) {
       await prisma.auditLog.create({
         data: {
@@ -363,73 +339,96 @@ Devuelve SOLO un JSON válido con esta estructura exacta (sin markdown, sin expl
       return NextResponse.json({
         success: true,
         parseOnly: true,
-        message: "Parse realizado correctamente. No se guardó la transacción.",
         transcription,
         parsed: { ...parsedData, signedAmount },
-        creditsRemaining: user.aiCreditsRemaining - creditsNeeded,
       });
     }
 
-    // Continúa con la creación real si parseOnly === false
+    if (!parseOnly) {
+      const tokensIn = Math.ceil(transcription.length / 4); // aprox 4 chars per token
+      const tokensOut = Math.ceil(JSON.stringify(parsedData).length / 4);
+      const remainingCredits = user.aiCreditsRemaining - creditsNeeded;
 
-    // Buscar o crear cuenta principal
-    let account = await prisma.account.findFirst({ where: { userId } });
-    if (!account) {
-      account = await prisma.account.create({
-        data: { userId, name: "Cuenta principal", balance: 0, currency: "PEN" },
-      });
-    }
-
-    // Calcular nuevo saldo y crear la transacción
-    let newBalance = new Decimal(account.balance).plus(signedAmount);
-
-    const transaction = await prisma.transaction.create({
-      data: {
-        userId,
-        accountId: account.id,
-        type: parsedData.type,
-        amount: signedAmount,
-        categoryId,
-        note: parsedData.description,
-        occurredAt: new Date(),
-      },
-    });
-
-    await prisma.account.update({ where: { id: account.id }, data: { balance: newBalance } });
-
-    // Crear log de auditoría
-    await prisma.auditLog.create({
-      data: {
-        actorId: userId,
-        action: `Creó transacción por voz (${parsedData.type})`,
-        detail: {
-          transcription,
-          parsed: parsedData,
-          amount: parsedData.amount,
-          categoryId,
+      await prisma.aiUsage.create({
+        data: {
+          userId,
+          provider: "groq",
+          requestType: "other",
+          model: "whisper-large-v3-turbo",
+          tokensIn,
+          tokensOut,
+          tokensTotal: tokensIn + tokensOut,
+          creditsCharged: creditsNeeded,
+          costEstimateUsd: 0.01 * creditsNeeded,
+          inputJson: { transcription },
+          outputJson: parsedData,
         },
-      },
-    });
+      });
 
-    // ✅ PASO 6: Responder con éxito
-    console.log(`[Voice] Transacción creada exitosamente: ${transaction.id}`);
+      await prisma.user.update({
+        where: { id: userId },
+        data: { aiCreditsRemaining: remainingCredits },
+      });
 
-    return NextResponse.json({
-      success: true,
-      message: "✅ Transacción registrada por voz exitosamente",
-      transcription,
-      parsed: parsedData,
-      transaction: {
-        id: transaction.id,
-        type: transaction.type,
-        amount: transaction.amount,
-        description: transaction.note,
-        categoryId: transaction.categoryId,
-        occurredAt: transaction.occurredAt,
-      },
-      newBalance: newBalance.toNumber(),
-      creditsRemaining: user.aiCreditsRemaining - creditsNeeded,
-    });
+      // Buscar o crear cuenta principal
+      let account = await prisma.account.findFirst({ where: { userId } });
+      if (!account) {
+        account = await prisma.account.create({
+          data: { userId, name: "Cuenta principal", balance: 0, currency: "PEN" },
+        });
+      }
+
+      // Calcular nuevo saldo y crear la transacción
+      let newBalance = new Decimal(account.balance).plus(signedAmount);
+
+      const transaction = await prisma.transaction.create({
+        data: {
+          userId,
+          accountId: account.id,
+          type: parsedData.type,
+          amount: signedAmount,
+          categoryId,
+          note: parsedData.description,
+          occurredAt: new Date(),
+        },
+      });
+
+      await prisma.account.update({ where: { id: account.id }, data: { balance: newBalance } });
+
+      // Crear log de auditoría
+      await prisma.auditLog.create({
+        data: {
+          actorId: userId,
+          action: `Creó transacción por voz (${parsedData.type})`,
+          detail: {
+            transcription,
+            parsed: parsedData,
+            amount: parsedData.amount,
+            categoryId,
+          },
+        },
+      });
+
+      // ✅ PASO 6: Responder con éxito
+      console.log(`[Voice] Transacción creada exitosamente: ${transaction.id}`);
+
+      return NextResponse.json({
+        success: true,
+        message: "✅ Transacción registrada por voz exitosamente",
+        transcription,
+        parsed: parsedData,
+        transaction: {
+          id: transaction.id,
+          type: transaction.type,
+          amount: transaction.amount,
+          description: transaction.note,
+          categoryId: transaction.categoryId,
+          occurredAt: transaction.occurredAt,
+        },
+        newBalance: newBalance.toNumber(),
+        creditsRemaining: remainingCredits,
+      });
+    }
 
   } catch (error) {
     console.error("[Voice] Error general en POST /api/voice/transaction:", error);

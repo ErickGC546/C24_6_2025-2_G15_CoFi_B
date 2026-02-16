@@ -89,126 +89,136 @@ export default function UserWelcome({ userName }: UserWelcomeProps) {
   }, [currentSlide]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#f1fff5] via-white to-[#f7fff9] text-[#082214]">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-10 sm:px-6 md:px-10">
-        <section className="grid gap-8 rounded-3xl bg-white/80 p-6 text-center shadow-[0_30px_80px_rgba(16,185,129,0.18)] backdrop-blur sm:p-8 md:grid-cols-[1.1fr,0.9fr] md:text-left">
-          <div className="space-y-6">
-            <div className="inline-flex w-full items-center justify-center gap-3 rounded-full border border-emerald-100 px-4 py-1 text-xs font-semibold tracking-[0.25em] text-emerald-600 md:w-auto md:justify-start">
-              COFI LIVE
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            </div>
-            <div className="space-y-3">
-              <p className="text-xs uppercase tracking-[0.4em] text-emerald-500 sm:text-sm">Hola, {userName}</p>
-              <h1 className="text-3xl font-semibold leading-tight sm:text-4xl" style={{ fontFamily: 'Space Grotesk, Sora, sans-serif' }}>
-                Esta es tu cápsula de control financiero. Aquí descubrirás todo lo que COFI hace por ti.
-              </h1>
-              <p className="text-base text-emerald-900/80">
-                Explora las capacidades más poderosas de la app antes de abrirla. Cada módulo fue creado para ayudarte a tomar decisiones rápidas con el soporte de IA.
-              </p>
-            </div>
-            <div className="rounded-2xl bg-emerald-50 p-5">
-              <p className="text-sm font-semibold text-emerald-700">Descarga inmediata</p>
-              <p className="text-xs text-emerald-900/70">Disponible para Android. Próximamente iOS y versión desktop.</p>
-              <a
-                href="https://github.com/ErickGC546/C24_6_2025-2_G15_CoFi_B/releases/download/CoFi/CoFi.apk"
-                download="CoFi.apk"
-                className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-[#082214] px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 transition hover:-translate-y-0.5 md:w-auto"
-              >
-                📱 Descargar COFI para Android
-              </a>
-            </div>
-          </div>
+    <div className="min-h-screen bg-[#030c06] pb-16 text-white relative overflow-hidden">
+      <div
+        className="absolute inset-0 opacity-50"
+        style={{
+          background:
+            'radial-gradient(circle at top left, rgba(34,197,94,0.25), transparent 45%), radial-gradient(circle at 80% 20%, rgba(12,92,60,0.4), transparent 50%)'
+        }}
+      />
 
-          <div className="rounded-3xl bg-gradient-to-br from-[#0f2a1a] to-[#051309] p-6 text-white">
-            <div className="relative h-60 sm:h-64">
-              {slides.map((slide, index) => (
-                <article
-                  key={slide.title}
-                  className={`absolute inset-0 flex flex-col justify-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-6 transition-opacity duration-500 ${
-                    currentSlide === index ? 'opacity-100' : 'opacity-0'
-                  }`}
-                >
-                  <span className="text-6xl" role="img" aria-label={slide.title}>
-                    {slide.icon}
-                  </span>
-                  <h2 className="text-2xl font-semibold" style={{ fontFamily: 'Space Grotesk, Sora, sans-serif' }}>
-                    {slide.title}
-                  </h2>
-                  <p className="text-sm text-emerald-50/80">{slide.description}</p>
-                </article>
-              ))}
-            </div>
-            <div className="mt-4 flex justify-center gap-2">
-              {slides.map((_, index) => (
-                <button
-                  key={`user-slide-${index}`}
-                  type="button"
-                  aria-label={`Ir al slide ${index + 1}`}
-                  onClick={() => setCurrentSlide(index)}
-                  className={`h-2 w-8 rounded-full transition ${
-                    currentSlide === index ? 'bg-emerald-400' : 'bg-white/30'
-                  }`}
-                />
-              ))}
-            </div>
-            <div className="mt-6 rounded-2xl bg-white/10 p-4 text-xs text-emerald-100/80">
-              <p className="font-semibold text-white">Lo que verás al abrir la app</p>
-              <p>Tablero personalizado, recordatorios proactivos y métricas colaborativas listas para compartir.</p>
-            </div>
-          </div>
-        </section>
-
-        <section className="grid gap-5 sm:grid-cols-2">
-          {featureHighlights.map((feature) => (
-            <div key={feature.title} className="rounded-3xl border border-emerald-100 bg-white p-6 shadow-[0_12px_40px_rgba(5,67,34,0.08)]">
-              <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.4em] text-emerald-400">
-                {feature.badge}
-                <span className="h-px flex-1 bg-emerald-100" />
+      <div className="relative z-10 w-full px-4 py-10 sm:px-6 md:px-12">
+        <div className="mx-auto flex max-w-6xl flex-col gap-12 lg:gap-16">
+          <section className="grid gap-10 rounded-3xl bg-[#08150f]/70 p-8 text-center backdrop-blur-lg sm:p-10 md:grid-cols-2 md:text-left">
+            <div className="flex flex-col gap-6">
+              <span className="inline-flex items-center justify-center rounded-full border border-emerald-600/40 bg-emerald-600/10 px-4 py-1 text-xs font-semibold tracking-[0.35em] text-emerald-300">
+                COFI LIVE
+              </span>
+              <div className="space-y-4">
+                <p className="text-sm uppercase tracking-[0.4em] text-emerald-400">Hola, {userName}</p>
+                <h1 className="text-3xl font-semibold leading-tight text-white sm:text-4xl" style={{ fontFamily: 'Space Grotesk, Sora, sans-serif' }}>
+                  Tu app está lista. Explora aquí lo que te espera cuando la abras.
+                </h1>
+                <p className="text-base text-emerald-100/80">
+                  Carruseles inteligentes, recordatorios preventivos y un copiloto de IA que traduce tus hábitos financieros en decisiones claras.
+                </p>
               </div>
-              <h3 className="mt-4 text-2xl font-semibold" style={{ fontFamily: 'Space Grotesk, Sora, sans-serif' }}>
-                {feature.title}
-              </h3>
-              <p className="mt-2 text-sm text-emerald-900/80">{feature.description}</p>
+              <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/10 p-5 text-left">
+                <p className="text-sm font-semibold text-emerald-200">Descarga inmediata</p>
+                <p className="text-xs text-emerald-100/70">Disponible para Android. Próximamente iOS y desktop.</p>
+                <a
+                  href="https://github.com/ErickGC546/C24_6_2025-2_G15_CoFi_B/releases/download/CoFi/CoFi.apk"
+                  download="CoFi.apk"
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-2xl bg-emerald-500 px-6 py-3 text-sm font-semibold text-[#030c06] shadow-lg shadow-emerald-500/30 transition hover:-translate-y-0.5 sm:w-auto"
+                >
+                  📱 Descargar COFI para Android
+                </a>
+              </div>
             </div>
-          ))}
-        </section>
 
-        <section className="grid gap-6 rounded-3xl bg-white p-6 sm:p-8 md:grid-cols-[1.1fr,0.9fr]">
-          <div className="space-y-5">
-            <p className="text-xs uppercase tracking-[0.4em] text-emerald-500 sm:text-sm">Experiencia diaria</p>
-            <h2 className="text-2xl font-semibold text-[#082214] sm:text-3xl" style={{ fontFamily: 'Space Grotesk, Sora, sans-serif' }}>
-              Así te acompaña COFI a lo largo del día.
-            </h2>
-            <div className="space-y-4">
-              {experienceMoments.map((moment) => (
-                <article key={moment.label} className="rounded-2xl border border-emerald-100/60 p-4">
-                  <p className="text-xs uppercase tracking-[0.4em] text-emerald-400">{moment.label}</p>
-                  <h3 className="mt-2 text-xl font-semibold" style={{ fontFamily: 'Space Grotesk, Sora, sans-serif' }}>
-                    {moment.title}
-                  </h3>
-                  <p className="text-sm text-emerald-900/80">{moment.detail}</p>
-                </article>
-              ))}
+            <div className="rounded-3xl bg-[#0e1d16] p-6 shadow-[0_20px_60px_rgba(15,118,110,.25)] sm:p-8">
+              <div className="relative h-64 sm:h-72">
+                {slides.map((slide, index) => (
+                  <article
+                    key={slide.title}
+                    className={`absolute inset-0 flex flex-col justify-center rounded-2xl bg-gradient-to-br from-[#12261b] to-[#0c140f] p-8 transition-opacity duration-500 ${
+                      currentSlide === index ? 'opacity-100' : 'opacity-0'
+                    }`}
+                  >
+                    <span className="text-6xl" role="img" aria-label={slide.title}>
+                      {slide.icon}
+                    </span>
+                    <h2 className="mt-6 text-2xl font-semibold text-white" style={{ fontFamily: 'Space Grotesk, Sora, sans-serif' }}>
+                      {slide.title}
+                    </h2>
+                    <p className="mt-2 text-base text-emerald-100/80">{slide.description}</p>
+                  </article>
+                ))}
+              </div>
+              <div className="mt-6 flex justify-center gap-2">
+                {slides.map((_, index) => (
+                  <button
+                    key={`user-slide-${index}`}
+                    type="button"
+                    aria-label={`Ir al slide ${index + 1}`}
+                    onClick={() => setCurrentSlide(index)}
+                    className={`h-2 w-8 rounded-full transition ${
+                      currentSlide === index ? 'bg-emerald-400' : 'bg-white/20'
+                    }`}
+                  />
+                ))}
+              </div>
+              <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-emerald-50/80">
+                <p className="font-semibold text-white">Lo que verás al abrir la app</p>
+                <p>Panel personal, comandos rápidos por voz y IA que te avisa antes de que un gasto se dispare.</p>
+              </div>
             </div>
-          </div>
-          <div className="space-y-4 rounded-2xl bg-emerald-50 p-6">
-            <p className="text-xs uppercase tracking-[0.3em] text-emerald-500 sm:text-sm">Compromiso COFI</p>
-            <h3 className="text-xl font-semibold text-[#082214] sm:text-2xl" style={{ fontFamily: 'Space Grotesk, Sora, sans-serif' }}>
-              Diseñado para protegerte.
-            </h3>
-            <ul className="space-y-3 text-sm text-emerald-900/80">
-              {commitment.map((item) => (
-                <li key={item} className="flex items-start gap-3">
-                  <span className="mt-1 h-2 w-2 rounded-full bg-emerald-500" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-        <footer className="flex flex-wrap items-center justify-center border-t border-white/10 pt-6 text-center text-sm text-emerald-100/70">
-          <span className="w-full">© {new Date().getFullYear()} COFI · Diseñado por ErickGC546</span>
-        </footer>
+          </section>
+
+          <section className="grid gap-6 sm:grid-cols-2">
+            {featureHighlights.map((feature) => (
+              <div key={feature.title} className="rounded-3xl border border-white/10 bg-white/5 p-6">
+                <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.4em] text-emerald-400">
+                  {feature.badge}
+                  <span className="h-px flex-1 bg-white/20" />
+                </div>
+                <h3 className="mt-4 text-2xl font-semibold text-white" style={{ fontFamily: 'Space Grotesk, Sora, sans-serif' }}>
+                  {feature.title}
+                </h3>
+                <p className="mt-2 text-sm text-emerald-100/80">{feature.description}</p>
+              </div>
+            ))}
+          </section>
+
+          <section className="grid gap-8 rounded-3xl bg-[#050f08] p-8 shadow-inner shadow-black/30 md:grid-cols-[1.1fr,0.9fr]">
+            <div className="space-y-5">
+              <p className="text-xs uppercase tracking-[0.4em] text-emerald-400">Experiencia diaria</p>
+              <h2 className="text-2xl font-semibold text-white sm:text-3xl" style={{ fontFamily: 'Space Grotesk, Sora, sans-serif' }}>
+                Así te acompaña COFI a lo largo del día.
+              </h2>
+              <div className="space-y-4">
+                {experienceMoments.map((moment) => (
+                  <article key={moment.label} className="rounded-2xl border border-white/5 bg-white/5 p-4">
+                    <p className="text-xs uppercase tracking-[0.4em] text-emerald-400">{moment.label}</p>
+                    <h3 className="mt-2 text-xl font-semibold text-white" style={{ fontFamily: 'Space Grotesk, Sora, sans-serif' }}>
+                      {moment.title}
+                    </h3>
+                    <p className="text-sm text-emerald-100/80">{moment.detail}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-4 rounded-2xl border border-white/5 bg-white/5 p-6 text-emerald-100">
+              <p className="text-xs uppercase tracking-[0.3em] text-emerald-300">Compromiso COFI</p>
+              <h3 className="text-2xl font-semibold text-white" style={{ fontFamily: 'Space Grotesk, Sora, sans-serif' }}>
+                Diseñado para protegerte.
+              </h3>
+              <ul className="space-y-3 text-sm text-emerald-50/80">
+                {commitment.map((item) => (
+                  <li key={item} className="flex items-start gap-3">
+                    <span className="mt-1 h-2 w-2 rounded-full bg-emerald-400" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+
+          <footer className="flex flex-wrap items-center justify-center border-t border-white/10 pt-6 text-center text-sm text-emerald-100/70">
+            <span className="w-full">© {new Date().getFullYear()} COFI · Diseñado por ErickGC546</span>
+          </footer>
+        </div>
       </div>
     </div>
   );
